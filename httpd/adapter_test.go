@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"webtyp.com/model"
@@ -556,5 +558,75 @@ func TestHTTPContextContextValue(t *testing.T) {
 	// Unset key should return "" from our map
 	if ctx.Value("notset") != "" {
 		t.Fatalf("Unset key should return \"\" from map")
+	}
+}
+
+func TestHTTPContextRemoteAddr(t *testing.T) {
+	var capturedRemoteAddr string
+	var capturedOverrideAddr string
+	var capturedStaticRemoteAddr string
+
+	srv := New(Config{})
+	r := srv.Router()
+
+	r.Get("/remote-addr", func(ctx router.Context) {
+		capturedRemoteAddr = ctx.Value(router.ContextKeyRemoteAddr)
+
+		// Explicit SetValue overrides RemoteAddr
+		ctx.SetValue(router.ContextKeyRemoteAddr, "10.0.0.9:1")
+		capturedOverrideAddr = ctx.Value(router.ContextKeyRemoteAddr)
+
+		ctx.WriteStatus(http.StatusOK)
+	}).Public()
+
+	// Serve static asset to verify static file / global batteries path context
+	tmpDir := t.TempDir()
+	r.PublicDir("/public", tmpDir)
+	if err := os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatalf("writing static file: %v", err)
+	}
+
+	h, err := srv.Handler()
+	if err != nil {
+		t.Fatalf("srv.Handler failed: %v", err)
+	}
+	// Wrap handler to inspect the context in global batteries / static path
+	wrapper := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/public/file.txt" {
+			ctx := &httpContext{w: w, r: r}
+			capturedStaticRemoteAddr = ctx.Value(router.ContextKeyRemoteAddr)
+		}
+		h.ServeHTTP(w, r)
+	})
+
+	ts := httptest.NewServer(wrapper)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL + "/remote-addr")
+	if err != nil {
+		t.Fatalf("GET /remote-addr failed: %v", err)
+	}
+	res.Body.Close()
+
+	resStatic, err := http.Get(ts.URL + "/public/file.txt")
+	if err != nil {
+		t.Fatalf("GET /public/file.txt failed: %v", err)
+	}
+	resStatic.Body.Close()
+
+	if capturedRemoteAddr == "" {
+		t.Fatalf("expected non-empty RemoteAddr")
+	}
+	if !bytes.HasPrefix([]byte(capturedRemoteAddr), []byte("127.0.0.1:")) {
+		t.Fatalf("expected RemoteAddr to start with 127.0.0.1:, got %q", capturedRemoteAddr)
+	}
+	if capturedOverrideAddr != "10.0.0.9:1" {
+		t.Fatalf("expected explicit SetValue override '10.0.0.9:1', got %q", capturedOverrideAddr)
+	}
+	if capturedStaticRemoteAddr == "" {
+		t.Fatalf("expected non-empty static route RemoteAddr")
+	}
+	if !bytes.HasPrefix([]byte(capturedStaticRemoteAddr), []byte("127.0.0.1:")) {
+		t.Fatalf("expected static route RemoteAddr to start with 127.0.0.1:, got %q", capturedStaticRemoteAddr)
 	}
 }

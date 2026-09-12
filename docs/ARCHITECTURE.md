@@ -27,7 +27,7 @@ wins — the tool never overrides code the user owns — but nothing generates i
 
 ## Components
 
-- **`adapter.go`**: Implementation of `router.Router`, `router.Context`, etc., mapping them to `net/http`.
+- **`adapter.go`**: Implementation of `router.Router`, `router.Context`, etc., mapping them to `net/http`. `httpd` produces `router.ContextKeyRemoteAddr` from `Request.RemoteAddr`.
 - **`middleware.go`**: Built-in `Gzip` and `NoCache` middlewares.
 - **`static.go`**: Static file serving from `PublicDir`.
 - **`enforce.go`**: RBAC enforcement based on `Requires` metadata.
