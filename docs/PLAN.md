@@ -21,5 +21,6 @@ PR: https://github.com/webtyp/server/pull/19
 |-------|------|---------|------|
 | 1 | [PLAN_REMOTE_ADDR.md](PLAN_REMOTE_ADDR.md) | httpd exposes `router.ContextKeyRemoteAddr` (phase R2 of `LAN_RUT_AUTH_MASTER_PLAN.md` in `tinywasm/app` docs) | requires `webtyp.com/router` tag with the constant — `go get webtyp.com/router@latest` first |
 | 2 | [PLAN_DOTENV_VISIBILITY.md](PLAN_DOTENV_VISIBILITY.md) | unify the unsupported-file-event sentinel with devwatch (Stage A) + make the external server's `.env` visible (Stage B) | Stage A: none. **Stage B: do not start until `webtyp.com/gorun` publishes `Config.EnvFile`** (see its own text) |
+| 3 | [PLAN_DEVWATCH_DECOUPLE.md](PLAN_DEVWATCH_DECOUPLE.md) | drop the `webtyp.com/devwatch` import entirely — replace the borrowed sentinel with a local error type that satisfies devwatch's contract structurally | **do not start until `webtyp.com/devwatch` publishes `IsUnsupportedEvent`/`UnsupportedEventError`** — sibling plan `devwatch/docs/PLAN.md` (see its own text) |
 
 After completing all plans, run `gotest ./...` one final time: everything green.
