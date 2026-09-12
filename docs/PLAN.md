@@ -2,6 +2,8 @@
 PLAN: "fix: queued plans — httpd RemoteAddr producer, then the dotenv visibility fixes"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 15233554538843316298
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
