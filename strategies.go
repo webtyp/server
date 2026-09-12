@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"webtyp.com/devwatch"
 	"webtyp.com/gobuild"
 	"webtyp.com/gorun"
 	"webtyp.com/router"
@@ -23,6 +22,22 @@ import (
 const DefaultNoRoutesMsg = "<h3>No routes registered in In-Memory Server</h3>"
 
 var contentChangeEvents = []string{"write", "create", "rename"}
+
+// unsupportedFileEventError signals that HandleFileEvent does not act on
+// this event — no rebuild, no log line. It satisfies the devwatch
+// UnsupportedEventError interface (Unsupported() bool) structurally:
+// server does not import devwatch to participate in that contract.
+type unsupportedFileEventError struct{}
+
+func (unsupportedFileEventError) Error() string {
+	return "server: unsupported file event, no rebuild triggered"
+}
+
+func (unsupportedFileEventError) Unsupported() bool { return true }
+
+// ErrUnsupportedEvent is returned from HandleFileEvent for file events this
+// strategy does not act on.
+var ErrUnsupportedEvent error = unsupportedFileEventError{}
 
 type ServerStrategy interface {
 	Start(wg *sync.WaitGroup) error
@@ -545,5 +560,5 @@ func (s *externalStrategy) HandleFileEvent(fileName, extension, filePath, event 
 		}
 		return err
 	}
-	return devwatch.ErrUnsupportedEvent
+	return ErrUnsupportedEvent
 }
