@@ -9,7 +9,7 @@ require (
 	webtyp.com/fmt v1.0.0
 	webtyp.com/gobuild v0.0.28
 	webtyp.com/gorun v0.0.26
-	webtyp.com/json v0.5.25
+	webtyp.com/json v0.5.26
 	webtyp.com/model v0.1.9
 	webtyp.com/router v0.1.38
 )
