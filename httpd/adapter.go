@@ -93,6 +93,9 @@ func (c *httpContext) Value(key string) string {
 	if v, ok := c.values[key]; ok {
 		return v
 	}
+	if key == router.ContextKeyRemoteAddr {
+		return c.r.RemoteAddr
+	}
 	if v, ok := c.r.Context().Value(key).(string); ok {
 		return v
 	}
