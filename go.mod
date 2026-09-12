@@ -5,7 +5,7 @@ go 1.25.2
 require (
 	github.com/smallstep/truststore v0.13.0
 	golang.org/x/crypto v0.53.0
-	webtyp.com/devwatch v0.0.61
+	webtyp.com/devwatch v0.0.62
 	webtyp.com/fmt v1.0.0
 	webtyp.com/gobuild v0.0.28
 	webtyp.com/gorun v0.0.26
