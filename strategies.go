@@ -13,13 +13,12 @@ import (
 	"sync"
 	"time"
 
+	"webtyp.com/devwatch"
 	"webtyp.com/gobuild"
 	"webtyp.com/gorun"
 	"webtyp.com/router"
 	"webtyp.com/server/httpd"
 )
-
-var ErrUnsupportedEvent = errors.New("server: unsupported file event, no rebuild triggered")
 
 const DefaultNoRoutesMsg = "<h3>No routes registered in In-Memory Server</h3>"
 
@@ -383,6 +382,7 @@ func newExternalStrategy(h *ServerHandler) *externalStrategy {
 		KillAllOnStop:        true,
 		DisableGlobalCleanup: h.Config.DisableGlobalCleanup,
 		WorkingDir:           filepath.Join(h.AppRootDir, h.OutputDir),
+		EnvFile:              filepath.Join(h.AppRootDir, ".env"),
 	})
 
 	// Add output binary to .gitignore to prevent accidental commits
@@ -545,5 +545,5 @@ func (s *externalStrategy) HandleFileEvent(fileName, extension, filePath, event 
 		}
 		return err
 	}
-	return ErrUnsupportedEvent
+	return devwatch.ErrUnsupportedEvent
 }

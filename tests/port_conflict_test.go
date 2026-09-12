@@ -90,12 +90,12 @@ func main() {
 		t.Fatalf("creating main.go: %v", err)
 	}
 
-	h := server.New().
-		SetAppRootDir(tmp).
-		SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator)))).
-		SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator)))).
-		SetPort(portStr).
-		SetExitChan(make(chan bool)).
+	h := server.New()
+	h.SetAppRootDir(tmp)
+	h.SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator))))
+	h.SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator))))
+	h.SetPort(portStr)
+	h = h.SetExitChan(make(chan bool)).
 		SetLogger(t.Log)
 
 	// Test 1: Start server normally
@@ -110,12 +110,12 @@ func main() {
 
 	// Test 2: Try to start a second server on the same port (this should cause conflict)
 	// Create second handler with same port
-	h2 := server.New().
-		SetAppRootDir(tmp).
-		SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator)))).
-		SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator)))).
-		SetPort(portStr).
-		SetExitChan(make(chan bool)).
+	h2 := server.New()
+	h2.SetAppRootDir(tmp)
+	h2.SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator))))
+	h2.SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator))))
+	h2.SetPort(portStr)
+	h2 = h2.SetExitChan(make(chan bool)).
 		SetLogger(t.Log)
 	if err := h2.SetExternalServerMode(true); err != nil {
 		t.Fatalf("failed to set external server mode: %v", err)

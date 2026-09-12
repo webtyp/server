@@ -71,12 +71,12 @@ go 1.20
 		t.Fatalf("creating go.mod: %v", err)
 	}
 
-	h := server.New().
-		SetAppRootDir(tmp).
-		SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator)))).
-		SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator)))).
-		SetPublicDir(publicDir).
-		SetPort(fmt.Sprintf("%d", port)).
+	h := server.New()
+	h.SetAppRootDir(tmp)
+	h.SetSourceDir(filepath.ToSlash(strings.TrimPrefix(sourceDir, tmp+string(os.PathSeparator))))
+	h.SetOutputDir(filepath.ToSlash(strings.TrimPrefix(outputDir, tmp+string(os.PathSeparator))))
+	h.SetPort(fmt.Sprintf("%d", port))
+	h = h.SetPublicDir(publicDir).
 		SetExitChan(make(chan bool, 1)).
 		SetLogger(logger)
 

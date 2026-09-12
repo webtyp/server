@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"webtyp.com/devwatch"
 	gobuildmock "webtyp.com/gobuild/mock"
 	gorunmock "webtyp.com/gorun/mock"
 )
@@ -60,7 +61,7 @@ func TestHandleFileEvent_Fast(t *testing.T) {
 			event:         "remove",
 			expectCompile: 0,
 			expectRun:     0,
-			expectErr:     ErrUnsupportedEvent,
+			expectErr:     devwatch.ErrUnsupportedEvent,
 		},
 		{
 			name:          "write event - compile error",
