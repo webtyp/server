@@ -112,4 +112,13 @@ if err := s.ListenAndServe(); err != nil {
 without opening a port, for use with `httptest`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 for design details.
 
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — what the `httpd` subpackage is and why:
+  the generated server entry point, RBAC enforcement, and the development TLS chain.
+- [`docs/DESIGN.md`](docs/DESIGN.md) — decisions and rejected alternatives, including
+  [why the dev certificate uses `smallstep/truststore` and not `mkcert`](docs/DESIGN.md#why-the-dev-certificate-uses-smallsteptruststore-and-not-mkcert).
+- [`docs/handoff-protocol.md`](docs/handoff-protocol.md) — the graceful module-swap
+  sequence used when a WASM module is recompiled while the server is running.
+
 ## [Contributing](https://github.com/cdvelop/cdvelop/blob/main/CONTRIBUTING.md)

@@ -66,10 +66,10 @@ a PWA from a phone on the LAN.
 It generates a **two-level chain**, the same shape `mkcert` and Caddy's internal
 PKI use:
 
-- **The CA** (`ca.go`) — `IsCA: true`, `KeyUsageCertSign | KeyUsageCRLSign`,
+- **The CA** (`httpd/devcert.go`, `ensureDevCA`) — `IsCA: true`, `KeyUsageCertSign | KeyUsageCRLSign`,
   `MaxPathLen: 0`, no subject alternative names, long-lived. This is the file a
   device installs to trust the server.
-- **The leaf** (`devcert.go`) — signed by the CA, `IsCA: false`,
+- **The leaf** (`httpd/devcert.go`, `ensureDevCert`) — signed by the CA, `IsCA: false`,
   `serverAuth`, and a SAN set covering `localhost`, `127.0.0.1`, `::1` **and
   every non-loopback IPv4 of the host's interfaces**. It is regenerated when
   that address set changes, so a laptop moving between networks does not keep
@@ -91,9 +91,19 @@ the flag against any certificate in the presented chain, so pinning the CA would
 appear to work — and would silently grant the browser trust in every certificate
 that CA ever signs, surviving a leaf rotation unnoticed.
 
-Nothing is installed into the developer's own OS trust store. The browser is
-launched by `webtyp.com/devbrowser`, so it is configured rather than convinced,
-which needs no elevated privileges and leaves nothing behind.
+### Installing the CA into the developer's own OS trust store
+
+On first generation the CA is also installed into the host's trust stores via
+`github.com/smallstep/truststore`, so that clients which were **not** launched by
+`webtyp.com/devbrowser` — a second browser, `curl`, a native client — do not see
+a warning. The step is best-effort: on Linux it shells out through `sudo` and may
+prompt, and any failure is logged as a warning rather than aborting the listen.
+Setting `WEBTYP_DEVCERT_SKIP_TRUSTSTORE` to any non-empty value skips it
+entirely; test runners and CI set it. Nothing about serving TLS depends on it —
+the SPKI flag and `CAPath` still work when it is skipped or fails.
+
+Why that dependency rather than `mkcert` or hand-written per-platform code is
+argued in [`DESIGN.md`](DESIGN.md).
 
 On iOS, installing a profile is **two steps** and the platform announces only
 the first: install it (Settings → Profile Downloaded), then enable it under
