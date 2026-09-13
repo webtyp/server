@@ -67,6 +67,11 @@ func (s *Server) wrapWithBatteries(handler http.Handler) http.Handler {
 				}
 
 				if shouldServe {
+					// The application shell is the one file under PublicDir that is
+					// not public — see shell.go.
+					if s.denyShellWithoutSession(w, r, absDir, fullPath) {
+						return
+					}
 					// Serve the file directly using the original response writer.
 					// wrapWithGlobalBatteries (applied in Handler()) will handle compression.
 					http.ServeFile(w, r, fullPath)
