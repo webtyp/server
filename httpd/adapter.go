@@ -70,7 +70,7 @@ func (c *httpContext) Write(b []byte) (int, error) {
 }
 
 func (c *httpContext) Decode(into model.Decodable) error {
-	return json.Decode(c.Body(), into)
+	return decodeBody(c, into)
 }
 
 func (c *httpContext) Encode(v model.Encodable) error {
