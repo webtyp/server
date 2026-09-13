@@ -2,6 +2,8 @@
 PLAN: "feat: Context.Decode acepta formularios HTML (x-www-form-urlencoded), no solo JSON"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 7890483313307634891
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
