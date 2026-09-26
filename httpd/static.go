@@ -68,8 +68,9 @@ func (s *Server) wrapWithBatteries(handler http.Handler) http.Handler {
 
 				if shouldServe {
 					// The application shell is the one file under PublicDir that is
-					// not public — see shell.go.
-					if s.denyShellWithoutSession(w, r, absDir, fullPath) {
+					// not public, and the root landing page is the one file a session
+					// should not stay on — see shell.go.
+					if s.routeBySession(w, r, absDir, fullPath) {
 						return
 					}
 					// Serve the file directly using the original response writer.

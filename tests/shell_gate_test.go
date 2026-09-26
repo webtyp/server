@@ -99,6 +99,33 @@ func TestShellIsClosedWithoutSession(t *testing.T) {
 		}
 	})
 
+	// The other half of the split: "/" is the landing for a visitor WITHOUT a
+	// session. With one, serving it again strands the user on a login form — and
+	// the Authn middleware (where DEV_AUTOLOGIN lives) never even runs, because
+	// "/" is a plain static file.
+	t.Run("a session on the public page goes to the shell", func(t *testing.T) {
+		h := handlerFor(t, dir, true, "user-1")
+		resp := get(t, h, "/")
+		if resp.StatusCode != http.StatusFound {
+			t.Errorf("GET /: status = %d, want %d", resp.StatusCode, http.StatusFound)
+		}
+		if got := resp.Header.Get("Location"); got != "/app/" {
+			t.Errorf("GET /: Location = %q, want %q", got, "/app/")
+		}
+	})
+
+	// A pure static site has no shell to send anyone to.
+	t.Run("without a shell the root page stays for a session", func(t *testing.T) {
+		siteOnly := t.TempDir()
+		if err := os.WriteFile(filepath.Join(siteOnly, "index.html"), []byte("<h1>site</h1>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		h := handlerFor(t, siteOnly, true, "user-1")
+		if resp := get(t, h, "/"); resp.StatusCode != http.StatusOK {
+			t.Errorf("GET /: status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+	})
+
 	// An application with no authentication has no session to lack. Gating the
 	// shell there would break every static WASM project that never asked for a
 	// login — the feature must be invisible to them.

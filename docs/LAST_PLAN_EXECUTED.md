@@ -1,131 +1,78 @@
----
-PLAN: "refactor: drop the webtyp.com/devwatch dependency, keep the unsupported-event contract structurally"
-EXECUTOR: jules
-REVIEWER: none
----
+# PLAN — `/` con sesión debe llevar al shell (`/app/`)
 
-> This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
->
-> **Depends on `webtyp.com/devwatch` publishing `UnsupportedEventError` and
-> `IsUnsupportedEvent`** — sibling plan
-> [`devwatch/docs/PLAN.md`](https://github.com/webtyp/devwatch/blob/main/docs/PLAN.md).
-> **Do not start until that tag exists.** As the first line of work, run
-> `go list -m -versions webtyp.com/devwatch` (or check
-> `https://github.com/webtyp/devwatch/releases`) and confirm a published tag
-> contains `IsUnsupportedEvent` — `grep -rn "func IsUnsupportedEvent"` the
-> downloaded module cache, or read the tagged source on GitHub. Never add a
-> `replace`, never invent a version, never start Stage 1 against an
-> unpublished devwatch tag.
+## Problema
 
-# Plan — `webtyp.com/server`: remove the `devwatch` import
+Un proyecto con páginas públicas **y** aplicación WASM tiene dos documentos
+(`sitec`): la página pública en `/` (sin bootstrap wasm) y el shell en `/app/`.
+`httpd/shell.go` ya cierra una mitad del reparto: `/app/` **sin** sesión →
+`302 /`. La otra mitad falta: `/` **con** sesión se sirve igual, como un
+archivo estático más, y **nunca consulta `Authn`**.
 
-## 0. Context
+Síntoma real (mjosefa-cms, 2026-09-26): con `DEV_AUTOLOGIN` puesto, el navegador
+abre `http://localhost:8080/`, recibe la pantalla de login estática (sin un solo
+`<script>`) y ahí se queda. El autologin de `webtyp.com/auth` vive en el
+middleware `Authn`, así que no se ejecuta nunca en esa petición:
 
-`server` currently imports `webtyp.com/devwatch` for exactly one symbol:
-`devwatch.ErrUnsupportedEvent`, returned from
-`externalStrategy.HandleFileEvent` (`strategies.go:548`) to tell the
-`devwatch` watcher "this file event isn't mine, don't log it, don't
-reload." This is a backwards dependency direction: `devwatch` is the
-dev-mode file watcher that *consumes* `server` (via the
-`FilesEventHandlers` interface `server.ServerHandler` implements); `server`
-has no business importing the tool that drives it, just to borrow one error
-value.
-
-The sibling `devwatch` plan referenced above adds a **structural** (duck-typed)
-way to signal "unsupported": any error type — in any package — implementing
-
-```go
-type UnsupportedEventError interface {
-	error
-	Unsupported() bool
-}
+```
+curl -D - http://localhost:8080/app/  → 200 + Set-Cookie: session=…   (autologin OK)
+curl -D - http://localhost:8080/      → 200, sin cookie                (Authn nunca corre)
 ```
 
-is recognized by `devwatch.IsUnsupportedEvent(err)`, which both of
-`devwatch`'s internal call sites now use instead of a direct
-`errors.Is(err, devwatch.ErrUnsupportedEvent)`. This plan makes `server`
-define its **own** local error type satisfying that method set — recognized
-by `devwatch` at runtime without `server` ever importing it.
+El mismo hueco lo sufre un usuario real con sesión vigente: abre `/` (el
+marcador, la URL que abre el daemon) y ve el formulario de login otra vez.
 
-**Ordering matters.** If `server` switches to a local, unimported sentinel
-*before* the running `devwatch` version understands the structural contract,
-`devwatch`'s old `errors.Is(err, devwatch.ErrUnsupportedEvent)` check will no
-longer match `server`'s new local type at all, and the original bug this
-whole effort started from — one spurious "InitialRegistration file error"
-log line per `.go` file on every `webtyp dev` startup, repeating on every
-live edit — comes back. This is why the gate above is absolute: verify the
-structural contract exists in a published `devwatch` tag before writing any
-other line of this plan.
+## Auditoría de tests — por qué la suite pasa con el bug
 
-## Stage 1 — local, import-free sentinel
+- `tests/shell_gate_test.go` → `TestShellIsClosedWithoutSession/"the public page
+  stays public"` solo prueba `/` **anónimo**. Nadie prueba `/` con sesión.
+- `webtyp.com/auth` prueba `DEV_AUTOLOGIN` contra el middleware en una ruta del
+  router, nunca contra la página de aterrizaje que sirve el fallback estático de
+  `httpd` — que es justo por donde entra el navegador.
 
-**File:** `strategies.go`.
+Sonda (overlay, sin tocar el repo) — falla por el síntoma exacto:
 
-- Delete the import `"webtyp.com/devwatch"` from the import block.
-- Add, near the top of the file (alongside other package-level `var`/`type`
-  declarations — check the file for an existing convention spot before
-  picking one):
-
-```go
-// unsupportedFileEventError signals that HandleFileEvent does not act on
-// this event — no rebuild, no log line. It satisfies webtyp.com/devwatch's
-// UnsupportedEventError interface (Unsupported() bool) structurally:
-// server does not import devwatch to participate in that contract.
-type unsupportedFileEventError struct{}
-
-func (unsupportedFileEventError) Error() string {
-	return "server: unsupported file event, no rebuild triggered"
-}
-
-func (unsupportedFileEventError) Unsupported() bool { return true }
-
-// ErrUnsupportedEvent is returned from HandleFileEvent for file events this
-// strategy does not act on.
-var ErrUnsupportedEvent error = unsupportedFileEventError{}
+```
+GET / with session: status=200 Location="", want 302 /app/
 ```
 
-- Line 548: change `return devwatch.ErrUnsupportedEvent` to
-  `return ErrUnsupportedEvent`.
-- Confirm `errors` is still imported/used elsewhere in the file (there is at
-  least one other use, in `Stop()`/mode-switch error handling) before
-  deciding whether anything else in the import block needs to change — it
-  should not.
+## Decisión
 
-## Stage 2 — test file
+Regla simétrica a `denyShellWithoutSession`, con las mismas tres condiciones de
+activación y ninguna configuración nueva:
 
-**File:** `handle_file_event_test.go`.
+| Petición resuelve a | `Authn` configurado | ¿existe `<PublicDir>/app/index.html`? | Identidad | Respuesta |
+|---|---|---|---|---|
+| `<PublicDir>/app/index.html` | sí | — | no | `302 /` (ya existe) |
+| `<PublicDir>/index.html` | sí | sí | **sí** | **`302 /app/`** (nuevo) |
+| cualquier otro caso | | | | se sirve el archivo |
 
-- Remove `"webtyp.com/devwatch"` from the import block.
-- Change `expectErr: devwatch.ErrUnsupportedEvent` back to
-  `expectErr: ErrUnsupportedEvent`. The comparison is by `.Error()` string
-  (confirm this is still true at the comparison site before editing), so the
-  error message text is unchanged and the test keeps passing.
+- Solo el `index.html` **raíz** de `PublicDir` (el que `shellFallbackPath`
+  ya declara como aterrizaje sin sesión). Otras páginas públicas no se tocan.
+- Sin shell en disco no hay adónde ir: `/` se sirve normal (sitio estático puro).
+- Sin `Authn` no hay sesión que consultar: comportamiento actual intacto.
+- Sin bucle posible: `/` y `/app/` consultan el mismo `Authn` con la misma
+  cookie (`Path=/`).
+- Costo: una resolución de sesión (en caché) por `GET /` solo en proyectos con
+  shell + `Authn`.
 
-## Stage 3 — drop the module dependency
+**Fuera de alcance, a propósito:** un proyecto cuya `/` sea una landing de
+marketing y que quiera mostrarla también a usuarios con sesión. Hoy ese caso no
+existe en el ecosistema, y `shell.go` ya fija `/` como el aterrizaje sin sesión
+cuando hay shell; si aparece, se resuelve moviendo el login fuera de `/` en
+`sitec`, no con un flag aquí.
 
-**File:** `go.mod` (and `go.sum`).
+## Design gate
 
-- After Stage 1 and 2 compile with no remaining reference to
-  `webtyp.com/devwatch` anywhere in the module (`grep -rln "webtyp.com/devwatch" --include="*.go" .` → empty), run `go mod tidy` to remove the
-  now-unused `require webtyp.com/devwatch ...` line and its `go.sum`
-  entries.
-- Do not hand-edit `go.mod`/`go.sum` — let `go mod tidy` compute the correct
-  removal.
+Sin símbolos exportados nuevos ni cambios de firma. Una constante privada nueva
+(`shellPath = "/app/"`) junto a `shellFallbackPath`, con el mismo comentario de
+acoplamiento con `sitec.ShellPath` / `auth.PathAfterLogin`.
 
-## Acceptance criteria
+## Etapas
 
-1. `grep -rln "webtyp.com/devwatch" --include="*.go" .` → empty.
-2. `grep -n "webtyp.com/devwatch" go.mod` → empty.
-3. `go build ./...`, `go vet ./...`, `gotest ./...` green.
-4. Manually (or via the existing devwatch-side regression test, not this
-   repo's): a project run with `webtyp dev` in external mode still shows no
-   `InitialRegistration file error` lines for ordinary `.go` files this
-   strategy doesn't act on — the behavior this whole effort preserves, now
-   via the structural contract instead of a shared import.
-
-| Stage | File | Action |
+| # | Qué | Archivo |
 |---|---|---|
-| 0 | — | verify a published `webtyp.com/devwatch` tag has `IsUnsupportedEvent` / `UnsupportedEventError` |
-| 1 | `strategies.go` | local `unsupportedFileEventError` type + `ErrUnsupportedEvent` var, drop the `devwatch` import |
-| 2 | `handle_file_event_test.go` | drop the `devwatch` import, revert to the local `ErrUnsupportedEvent` |
-| 3 | `go.mod`, `go.sum` | `go mod tidy` removes the now-unused `webtyp.com/devwatch` requirement |
+| 1 | **Prueba roja — ya escrita.** En `TestShellIsClosedWithoutSession`: (a) `"a session on the public page goes to the shell"` — `handlerFor(t, dir, true, "user-1")`, `GET /` → `302`, `Location: /app/`; (b) `"without a shell the root page stays for a session"` — `PublicDir` solo con `index.html`, `GET /` con sesión → `200`. Correr `gotest`: (a) debe fallar con `status=200`. | `tests/shell_gate_test.go` |
+| 2 | Agregar `shellPath = "/app/"` y `isPublicLanding(absDir, fullPath) bool` (`index.html` raíz **y** existe `app/index.html`). Generalizar `denyShellWithoutSession` → `routeBySession(w, r, absDir, fullPath) bool`, que aplica las dos filas de la tabla. | `httpd/shell.go` |
+| 3 | Cambiar la única llamada a `s.denyShellWithoutSession(...)` por `s.routeBySession(...)`. | `httpd/static.go` |
+| 4 | `gotest` completo en verde → `gopush 'fix(httpd): / con sesión redirige al shell /app/'`. | — |
+| 5 | Consumidor: en `veltylabs/mjosefa-cms`, `go get webtyp.com/server@<nuevo>`, `gotest`, reiniciar `webtyp dev` y verificar en el navegador que con `DEV_AUTOLOGIN` abrir `/` termina en `/app/` con sesión. | `mjosefa-cms/go.mod` |
