@@ -2,8 +2,9 @@
 PLAN: "feat(httpd): httpStreamer.Done from the request context"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 6527762815071792014
+PR: https://github.com/webtyp/server/pull/21
 ---
 
 > Este plan se despacha con el flujo CodeJob. Ver skill: agents-workflow.

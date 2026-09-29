@@ -169,6 +169,12 @@ func (s *httpStreamer) Flush() {
 	}
 }
 
+// Done is closed when the client goes away or the server shuts down: it is
+// the request's own context, which net/http cancels in both cases.
+func (s *httpStreamer) Done() <-chan struct{} {
+	return s.r.Context().Done()
+}
+
 type httpRouter struct {
 	mux               *http.ServeMux
 	mu                sync.RWMutex

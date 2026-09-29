@@ -53,6 +53,19 @@ func (w *lazyGzipWriter) Close() {
 	}
 }
 
+func (w *lazyGzipWriter) Flush() {
+	if w.gz != nil {
+		w.gz.Flush()
+	}
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *lazyGzipWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 // Gzip middleware
 func Gzip(next router.HandlerFunc) router.HandlerFunc {
 	return func(ctx router.Context) {
