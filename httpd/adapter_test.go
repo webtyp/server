@@ -2,12 +2,14 @@ package httpd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -628,5 +630,56 @@ func TestHTTPContextRemoteAddr(t *testing.T) {
 	}
 	if !bytes.HasPrefix([]byte(capturedStaticRemoteAddr), []byte("127.0.0.1:")) {
 		t.Fatalf("expected static route RemoteAddr to start with 127.0.0.1:, got %q", capturedStaticRemoteAddr)
+	}
+}
+
+func TestHTTPStreamerDone(t *testing.T) {
+	srv := New(Config{})
+	r := srv.Router()
+
+	returned := make(chan struct{})
+
+	r.Stream("/s", func(st router.Streamer) {
+		defer close(returned)
+		st.Write([]byte("hello\n"))
+		st.Flush()
+		<-st.Done()
+	}).Public()
+
+	h, err := srv.Handler()
+	if err != nil {
+		t.Fatalf("srv.Handler failed: %v", err)
+	}
+
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/s", nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext failed: %v", err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /s failed: %v", err)
+	}
+
+	buf := make([]byte, 6)
+	_, err = res.Body.Read(buf)
+	if err != nil {
+		t.Fatalf("Read body failed: %v", err)
+	}
+
+	cancel()
+	res.Body.Close()
+
+	select {
+	case <-returned:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatalf("expected handler to exit after client cancel within 2s")
 	}
 }

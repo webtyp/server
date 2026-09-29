@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"bytes"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -82,7 +83,11 @@ func (s *Server) wrapWithBatteries(handler http.Handler) http.Handler {
 
 			// If still not found, send the original 404
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 page not found\n"))
+			if rec.buf.Len() > 0 {
+				w.Write(rec.buf.Bytes())
+			} else {
+				w.Write([]byte("404 page not found\n"))
+			}
 		}
 	})
 }
@@ -118,6 +123,7 @@ type statusRecorder struct {
 	notFound    bool
 	wroteHeader bool
 	snapshot    http.Header // headers as they were before the wrapped handler ran
+	buf         bytes.Buffer
 }
 
 func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
@@ -146,8 +152,26 @@ func (r *statusRecorder) WriteHeader(status int) {
 
 func (r *statusRecorder) Write(b []byte) (int, error) {
 	if r.notFound && !r.wroteHeader {
-		return len(b), nil
+		return r.buf.Write(b)
 	}
 	r.wroteHeader = true
 	return r.ResponseWriter.Write(b)
+}
+
+func (r *statusRecorder) Flush() {
+	if r.notFound && !r.wroteHeader {
+		r.wroteHeader = true
+		r.ResponseWriter.WriteHeader(http.StatusNotFound)
+		if r.buf.Len() > 0 {
+			r.ResponseWriter.Write(r.buf.Bytes())
+			r.buf.Reset()
+		}
+	}
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
