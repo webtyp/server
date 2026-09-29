@@ -2,6 +2,8 @@
 PLAN: "feat(httpd): httpStreamer.Done from the request context"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 6527762815071792014
 ---
 
 > Este plan se despacha con el flujo CodeJob. Ver skill: agents-workflow.
