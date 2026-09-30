@@ -216,6 +216,12 @@ func (r *httpRoute) Accepts(args model.Fielder) router.Route {
 	return r
 }
 
+// Describe records what the route does; a transport that lists routes publishes it.
+func (r *httpRoute) Describe(text string) router.Route {
+	r.info.Description = text
+	return r
+}
+
 func NewRouter(mux *http.ServeMux) router.Router {
 	return &httpRouter{
 		mux: mux,

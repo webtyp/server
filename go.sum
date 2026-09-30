@@ -23,3 +23,5 @@ webtyp.com/model v0.1.9 h1:XpkNiIQbIVaFrbh4E/UqdIutHFNA92//KSP4M/owaSQ=
 webtyp.com/model v0.1.9/go.mod h1:OkyYeE3GOG8eAQGhd9wVsORAhr+xYj3q8avpoGXG25c=
 webtyp.com/router v0.2.1 h1:z9oDLchRN1Jebr3UZrz4c2QZJnK2FjN/F7LXU5prADU=
 webtyp.com/router v0.2.1/go.mod h1:vq9bDpR18oNflHXZmbE2IOlGduRJqPugKDWe2mm6nk4=
+webtyp.com/router v0.3.0 h1:/lfCibuc2UHuADk0u64Cfr6FZt5cfHJO/HIz6I1AjJI=
+webtyp.com/router v0.3.0/go.mod h1:vq9bDpR18oNflHXZmbE2IOlGduRJqPugKDWe2mm6nk4=
