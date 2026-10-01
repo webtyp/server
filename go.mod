@@ -1,6 +1,6 @@
 module webtyp.com/server
 
-go 1.25.2
+go 1.26.8
 
 require (
 	github.com/smallstep/truststore v0.13.0
@@ -17,4 +17,5 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	howett.net/plist v1.0.0 // indirect
+	webtyp.com/pwa v0.1.1 // indirect
 )

@@ -21,5 +21,7 @@ webtyp.com/json v0.5.27 h1:QNljdAHaKJfi9FdToMvWDxAa/taHUJ8yNbkksGT4hUc=
 webtyp.com/json v0.5.27/go.mod h1:kIAtefqg9B8tHtYWelE6PAtpBILwuV61+9n+2bU/lxw=
 webtyp.com/model v0.1.9 h1:XpkNiIQbIVaFrbh4E/UqdIutHFNA92//KSP4M/owaSQ=
 webtyp.com/model v0.1.9/go.mod h1:OkyYeE3GOG8eAQGhd9wVsORAhr+xYj3q8avpoGXG25c=
+webtyp.com/pwa v0.1.1 h1:WlOjjwOfiXTxzWaEAJZzp1DzgDxL/LoiLtemr52eAik=
+webtyp.com/pwa v0.1.1/go.mod h1:gnpAT+pdfEUL9KST58CoqQQRSLda9N237QiXJGCJpqc=
 webtyp.com/router v0.3.0 h1:/lfCibuc2UHuADk0u64Cfr6FZt5cfHJO/HIz6I1AjJI=
 webtyp.com/router v0.3.0/go.mod h1:vq9bDpR18oNflHXZmbE2IOlGduRJqPugKDWe2mm6nk4=

@@ -96,9 +96,11 @@ func Gzip(next router.HandlerFunc) router.HandlerFunc {
 // NoCache middleware
 func NoCache(next router.HandlerFunc) router.HandlerFunc {
 	return func(ctx router.Context) {
-		ctx.SetHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+		ctx.SetHeader(headerCacheControl, "no-store, no-cache, must-revalidate, max-age=0")
 		ctx.SetHeader("Pragma", "no-cache")
 		ctx.SetHeader("Expires", "0")
 		next(ctx)
 	}
 }
+
+const headerCacheControl = "Cache-Control"

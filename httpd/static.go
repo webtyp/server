@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"webtyp.com/pwa"
 	"webtyp.com/router"
 )
 
@@ -73,6 +74,13 @@ func (s *Server) wrapWithBatteries(handler http.Handler) http.Handler {
 					// should not stay on — see shell.go.
 					if s.routeBySession(w, r, absDir, fullPath) {
 						return
+					}
+					// Cache policy from the one contract the compiler also follows
+					// (webtyp.com/pwa): content-hashed names are immutable, large
+					// artifacts are never HTTP-cached, everything else revalidates.
+					// In development NoCache already forbids caching altogether.
+					if !s.config.NoCache {
+						w.Header().Set(headerCacheControl, pwa.CacheControl(r.URL.Path))
 					}
 					// Serve the file directly using the original response writer.
 					// wrapWithGlobalBatteries (applied in Handler()) will handle compression.
