@@ -2,6 +2,8 @@
 PLAN: "feat(httpd)!: HTTPS by default — the zero TLSConfig serves the local CA, plain HTTP only with PlainHTTP"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 1247033780871728211
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
