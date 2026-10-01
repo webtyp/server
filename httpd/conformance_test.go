@@ -33,6 +33,7 @@ func TestHTTPDConformance(t *testing.T) {
 	conformance.Run(t, conformance.Factory{
 		New: func(t *testing.T, s conformance.Setup) (router.Router, conformance.ServeFunc) {
 			srv := New(Config{
+				TLS:       TLSConfig{PlainHTTP: true},
 				Authorize: s.Authorize,
 				Authn: func(next router.HandlerFunc) router.HandlerFunc {
 					return func(ctx router.Context) {

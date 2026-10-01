@@ -45,14 +45,14 @@ const (
 type MainConfig struct {
 	Port      string
 	PublicDir string
-	DevTLS    bool // dev only; production uses AutoCert or Cert/Key
+	PlainHTTP bool
 }
 
 type mainTemplateData struct {
 	ModulePath   string
 	Port         string
 	PublicDir    string
-	DevTLS       bool
+	PlainHTTP    bool
 	RegisterArgs string
 }
 
@@ -64,7 +64,6 @@ package main
 import (
 	"log"
 	"{{.ModulePath}}/routes"
-	"webtyp.com/router"
 	"webtyp.com/server/httpd"
 )
 
@@ -74,21 +73,9 @@ func main() {
 		PublicDir: "{{.PublicDir}}",
 		Gzip:      true,
 		Health:    true,
-		TLS:       httpd.TLSConfig{DevTLS: {{.DevTLS}}},
+		TLS:       httpd.TLSConfig{PlainHTTP: {{.PlainHTTP}}},
 	})
 	routes.Register({{.RegisterArgs}})
-
-	// Serve the development CA so a device on the LAN can install it and trust
-	// the dev certificate. Responds 503 when no dev certificate exists.
-	s.Router().PublicAsset(httpd.CAPath, func(c router.Context) {
-		der, err := httpd.DevCA()
-		if err != nil {
-			c.WriteStatus(503)
-			return
-		}
-		c.SetHeader("Content-Type", httpd.CADownloadContentType)
-		c.Write(der)
-	})
 
 	if err := s.ListenAndServe(); err != nil {
 		log.Fatal(err)
@@ -142,7 +129,7 @@ func GenerateMain(rootDir, modulePath string, cfg MainConfig) (string, error) {
 		ModulePath:   modulePath,
 		Port:         cfg.Port,
 		PublicDir:    cfg.PublicDir,
-		DevTLS:       cfg.DevTLS,
+		PlainHTTP:    cfg.PlainHTTP,
 		RegisterArgs: registerArgs,
 	}
 

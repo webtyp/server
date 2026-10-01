@@ -4,54 +4,108 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/smallstep/truststore"
 )
 
 const (
-	devCertOrg      = "WebTyp Dev CA"
-	devCertHostname = "localhost"
-	devCertIP4Loop  = "127.0.0.1"
-	devCertIP6Loop  = "::1"
+	localCertOrg      = "WebTyp Local CA"
+	localCertHostname = "localhost"
+	localCertIP4Loop  = "127.0.0.1"
+	localCertIP6Loop  = "::1"
 
-	devCAFilename    = "ca.crt"
-	devCAKeyFilename = "ca.key"
-	devCertFilename  = "localhost.crt"
-	devKeyFilename   = "localhost.key"
-	devSANsFilename  = "localhost.sans" // records the SANs the cert on disk was built with
-	pemTypeCert      = "CERTIFICATE"
-	pemTypeECPrivate = "EC PRIVATE KEY"
+	localCAFilename    = "ca.crt"
+	localCAKeyFilename = "ca.key"
+	localCertFilename  = "localhost.crt"
+	localKeyFilename   = "localhost.key"
+	localSANsFilename  = "localhost.sans" // records the SANs the cert on disk was built with
+	pemTypeCert        = "CERTIFICATE"
+	pemTypeECPrivate   = "EC PRIVATE KEY"
 
-	devCertDirPerm  os.FileMode = 0o755
-	devKeyFilePerm  os.FileMode = 0o600
-	devSANsFilePerm os.FileMode = 0o644
-	devCAValidFor               = 10 * 365 * 24 * time.Hour
-	devCertValidFor             = 365 * 24 * time.Hour
+	localCertDirPerm    os.FileMode = 0o755
+	localKeyFilePerm     os.FileMode = 0o600
+	localSANsFilePerm    os.FileMode = 0o644
+	localCAValidFor                  = 10 * 365 * 24 * time.Hour
+	localCertValidFor                = 365 * 24 * time.Hour
+	localCertRenewBefore             = 30 * 24 * time.Hour
+	localCertRecheck                 = time.Hour
 
-	// EnvSkipTruststore, when set to any non-empty value, stops the dev
+	// EnvSkipTruststore, when set to any non-empty value, stops the local
 	// certificate from being installed into the OS trust store. The server
 	// still generates and serves the certificate (and CAPath still works); only
 	// the root-requiring system-trust step — which shells out to `sudo` on
 	// Linux and prompts — is skipped. Test runners and CI set this.
-	EnvSkipTruststore = "WEBTYP_DEVCERT_SKIP_TRUSTSTORE"
+	EnvSkipTruststore = "WEBTYP_LOCALCERT_SKIP_TRUSTSTORE"
 )
 
-// interfaceAddrs is net.InterfaceAddrs, indirected so tests can control the set
-// of host addresses the development certificate is issued for.
-var interfaceAddrs = net.InterfaceAddrs
+var errLocalCertDecode = errors.New("httpd: local certificate is not valid PEM")
 
-// devCertDir is where the development certificate, key and SAN record live.
-func devCertDir() (string, error) {
+var (
+	now            = time.Now
+	hostname       = os.Hostname
+	interfaceAddrs = net.InterfaceAddrs
+)
+
+// localCert hands the TLS stack the current leaf, regenerating it when it is close to
+// expiry or the host's address set changed.
+type localCert struct {
+	mu       sync.Mutex
+	cert     *tls.Certificate
+	notAfter time.Time
+	checked  time.Time
+	logf     func(...any)
+}
+
+func (l *localCert) get(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	currentTime := now()
+	needRefresh := l.cert == nil ||
+		!currentTime.Before(l.notAfter.Add(-localCertRenewBefore)) ||
+		currentTime.Sub(l.checked) > localCertRecheck
+
+	if !needRefresh {
+		return l.cert, nil
+	}
+
+	certFile, keyFile, err := ensureLocalCert(l.logf)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tlsCert.Certificate) > 0 {
+		x509Cert, err := x509.ParseCertificate(tlsCert.Certificate[0])
+		if err == nil {
+			l.notAfter = x509Cert.NotAfter
+		}
+	}
+
+	l.cert = &tlsCert
+	l.checked = currentTime
+	return l.cert, nil
+}
+
+// localCertDir is where the local certificate, key and SAN record live.
+func localCertDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -87,12 +141,19 @@ func lanIPs() []net.IP {
 	return out
 }
 
-// desiredSANs returns the DNS name and the IP addresses the development
+// desiredSANs returns the DNS name and the IP addresses the local
 // certificate must carry, and a stable string form of that set for change
 // detection.
 func desiredSANs() (dns []string, ips []net.IP, fingerprint string) {
-	dns = []string{devCertHostname}
-	ips = []net.IP{net.ParseIP(devCertIP4Loop), net.ParseIP(devCertIP6Loop)}
+	dns = []string{localCertHostname}
+	// Clinic PCs open the server by its Windows computer name (https://servidor:8080), not only by IP.
+	if name, err := hostname(); err == nil && name != "" {
+		lower := strings.ToLower(name)
+		if lower != localCertHostname {
+			dns = append(dns, lower)
+		}
+	}
+	ips = []net.IP{net.ParseIP(localCertIP4Loop), net.ParseIP(localCertIP6Loop)}
 	ips = append(ips, lanIPs()...)
 
 	parts := append([]string{}, dns...)
@@ -103,11 +164,11 @@ func desiredSANs() (dns []string, ips []net.IP, fingerprint string) {
 	return dns, ips, strings.Join(parts, ",")
 }
 
-// ensureDevCA returns the CA certificate and private key, loading them from
+// ensureLocalCA returns the CA certificate and private key, loading them from
 // disk if valid, or generating and saving them if missing or expired.
-func ensureDevCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.PrivateKey, []byte, error) {
-	caFile := filepath.Join(dir, devCAFilename)
-	caKeyFile := filepath.Join(dir, devCAKeyFilename)
+func ensureLocalCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.PrivateKey, []byte, error) {
+	caFile := filepath.Join(dir, localCAFilename)
+	caKeyFile := filepath.Join(dir, localCAKeyFilename)
 
 	if certPEM, err := os.ReadFile(caFile); err == nil {
 		if keyPEM, err := os.ReadFile(caKeyFile); err == nil {
@@ -116,7 +177,7 @@ func ensureDevCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.Priva
 			if certBlock != nil && keyBlock != nil {
 				caCert, err1 := x509.ParseCertificate(certBlock.Bytes)
 				caPriv, err2 := x509.ParseECPrivateKey(keyBlock.Bytes)
-				if err1 == nil && err2 == nil && time.Now().Before(caCert.NotAfter) {
+				if err1 == nil && err2 == nil && now().Before(caCert.NotAfter) {
 					return caCert, caPriv, certBlock.Bytes, nil
 				}
 			}
@@ -134,12 +195,12 @@ func ensureDevCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.Priva
 		return nil, nil, nil, err
 	}
 
-	now := time.Now()
+	currentTime := now()
 	caTemplate := x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{Organization: []string{devCertOrg}},
-		NotBefore:             now,
-		NotAfter:              now.Add(devCAValidFor),
+		Subject:               pkix.Name{Organization: []string{localCertOrg}},
+		NotBefore:             currentTime,
+		NotAfter:              currentTime.Add(localCAValidFor),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -157,7 +218,7 @@ func ensureDevCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.Priva
 		return nil, nil, nil, err
 	}
 
-	if err := writePEM(caFile, pemTypeCert, caDER, devSANsFilePerm); err != nil {
+	if err := writePEM(caFile, pemTypeCert, caDER, localSANsFilePerm); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -165,40 +226,40 @@ func ensureDevCA(dir string, logf func(...any)) (*x509.Certificate, *ecdsa.Priva
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err := writePEM(caKeyFile, pemTypeECPrivate, keyDER, devKeyFilePerm); err != nil {
+	if err := writePEM(caKeyFile, pemTypeECPrivate, keyDER, localKeyFilePerm); err != nil {
 		return nil, nil, nil, err
 	}
 
 	if os.Getenv(EnvSkipTruststore) == "" {
 		if ierr := truststore.Install(caCert); ierr != nil && logf != nil {
-			logf("Warning: failed to install dev CA certificate in truststore (browsers may show warning):", ierr)
+			logf("Warning: failed to install local CA certificate in truststore (browsers may show warning):", ierr)
 		}
 	}
 
 	return caCert, caPriv, caDER, nil
 }
 
-// ensureDevCert returns paths to the development certificate and key, generating
+// ensureLocalCert returns paths to the local certificate and key, generating
 // them on first use and regenerating them whenever the host's address set has
 // changed since the cert on disk was written. logf, when non-nil, receives a
 // best-effort warning if the CA cannot be installed in the OS truststore.
-func ensureDevCert(logf func(...any)) (certFile, keyFile string, err error) {
-	dir, err := devCertDir()
+func ensureLocalCert(logf func(...any)) (certFile, keyFile string, err error) {
+	dir, err := localCertDir()
 	if err != nil {
 		return "", "", err
 	}
-	if err := os.MkdirAll(dir, devCertDirPerm); err != nil {
+	if err := os.MkdirAll(dir, localCertDirPerm); err != nil {
 		return "", "", err
 	}
 
-	caCert, caPriv, caDER, err := ensureDevCA(dir, logf)
+	caCert, caPriv, caDER, err := ensureLocalCA(dir, logf)
 	if err != nil {
 		return "", "", err
 	}
 
-	certFile = filepath.Join(dir, devCertFilename)
-	keyFile = filepath.Join(dir, devKeyFilename)
-	sansFile := filepath.Join(dir, devSANsFilename)
+	certFile = filepath.Join(dir, localCertFilename)
+	keyFile = filepath.Join(dir, localKeyFilename)
+	sansFile := filepath.Join(dir, localSANsFilename)
 
 	dnsNames, ipAddrs, fingerprint := desiredSANs()
 
@@ -217,12 +278,12 @@ func ensureDevCert(logf func(...any)) (certFile, keyFile string, err error) {
 		return "", "", err
 	}
 
-	now := time.Now()
+	currentTime := now()
 	leafTemplate := x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{Organization: []string{devCertOrg}},
-		NotBefore:             now,
-		NotAfter:              now.Add(devCertValidFor),
+		Subject:               pkix.Name{Organization: []string{localCertOrg}},
+		NotBefore:             currentTime,
+		NotAfter:              currentTime.Add(localCertValidFor),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
@@ -243,10 +304,10 @@ func ensureDevCert(logf func(...any)) (certFile, keyFile string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	if err := writePEM(keyFile, pemTypeECPrivate, keyDER, devKeyFilePerm); err != nil {
+	if err := writePEM(keyFile, pemTypeECPrivate, keyDER, localKeyFilePerm); err != nil {
 		return "", "", err
 	}
-	if err := os.WriteFile(sansFile, []byte(fingerprint), devSANsFilePerm); err != nil {
+	if err := os.WriteFile(sansFile, []byte(fingerprint), localSANsFilePerm); err != nil {
 		return "", "", err
 	}
 
@@ -280,7 +341,10 @@ func fresh(certFile, keyFile, sansFile, fingerprint string) bool {
 	if err != nil {
 		return false
 	}
-	return time.Now().Before(cert.NotAfter)
+	if now().Add(localCertRenewBefore).After(cert.NotAfter) {
+		return false
+	}
+	return now().Before(cert.NotAfter)
 }
 
 func writePEM(path, blockType string, der []byte, perm os.FileMode) error {
@@ -293,7 +357,7 @@ func writePEM(path, blockType string, der []byte, perm os.FileMode) error {
 }
 
 func writeChainPEM(path string, certDERs ...[]byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, devSANsFilePerm)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, localSANsFilePerm)
 	if err != nil {
 		return err
 	}
@@ -306,45 +370,37 @@ func writeChainPEM(path string, certDERs ...[]byte) error {
 	return nil
 }
 
-// getOrCreateDevCert is the listen path's entry point; it routes the truststore
-// warning through the server's logger.
-func (s *Server) getOrCreateDevCert() (string, string, error) {
-	return ensureDevCert(s.log)
+// LocalCertFiles returns paths to the local certificate and key, creating
+// and truststore-installing them on first use.
+func LocalCertFiles() (certFile, keyFile string, err error) {
+	return ensureLocalCert(nil)
 }
 
-// DevCertFiles returns paths to the development certificate and key, creating
-// and truststore-installing them on first use. It is the same artifact the
-// DevTLS listen path serves, exposed for callers that manage their own
-// *http.Server (the internal dev strategy in webtyp.com/server).
-func DevCertFiles() (certFile, keyFile string, err error) {
-	return ensureDevCert(nil)
-}
-
-// DevCA returns the DER of the development certificate authority — the file a
+// LocalCA returns the DER of the local certificate authority — the file a
 // device installs to trust this server. It is NOT the certificate the server
-// presents; that is the leaf DevCA signed.
-func DevCA() ([]byte, error) {
-	if _, _, err := ensureDevCert(nil); err != nil {
+// presents; that is the leaf LocalCA signed.
+func LocalCA() ([]byte, error) {
+	if _, _, err := ensureLocalCert(nil); err != nil {
 		return nil, err
 	}
-	dir, err := devCertDir()
+	dir, err := localCertDir()
 	if err != nil {
 		return nil, err
 	}
-	pemBytes, err := os.ReadFile(filepath.Join(dir, devCAFilename))
+	pemBytes, err := os.ReadFile(filepath.Join(dir, localCAFilename))
 	if err != nil {
 		return nil, err
 	}
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
-		return nil, errDevCertDecode
+		return nil, errLocalCertDecode
 	}
 	return block.Bytes, nil
 }
 
-// devCertLeafDER returns the DER of the leaf certificate presented by the server.
-func devCertLeafDER() ([]byte, error) {
-	certFile, _, err := ensureDevCert(nil)
+// localCertLeafDER returns the DER of the leaf certificate presented by the server.
+func localCertLeafDER() ([]byte, error) {
+	certFile, _, err := ensureLocalCert(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +410,7 @@ func devCertLeafDER() ([]byte, error) {
 	}
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
-		return nil, errDevCertDecode
+		return nil, errLocalCertDecode
 	}
 	return block.Bytes, nil
 }

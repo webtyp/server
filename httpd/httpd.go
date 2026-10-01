@@ -45,6 +45,7 @@ type Server struct {
 	mux                   *http.ServeMux
 	router                *httpRouter
 	routesEndpointMounted bool
+	localCert             *localCert
 }
 
 func applyDefaults(c Config) Config {
@@ -63,6 +64,11 @@ func New(c Config) *Server {
 		config: c,
 		mux:    mux,
 		router: r,
+	}
+	s.localCert = &localCert{logf: s.log}
+
+	if c.TLS.mode() == tlsLocal {
+		r.PublicAsset(CAPath, serveLocalCA)
 	}
 
 	return s

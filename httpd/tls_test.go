@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -23,9 +24,9 @@ import (
 func TestValidateTLS_RejectsMultipleModes(t *testing.T) {
 	s := New(Config{
 		TLS: TLSConfig{
-			DevTLS:   true,
-			CertFile: "cert.pem",
-			KeyFile:  "key.pem",
+			PlainHTTP: true,
+			CertFile:  "cert.pem",
+			KeyFile:   "key.pem",
 		},
 	})
 
@@ -33,8 +34,26 @@ func TestValidateTLS_RejectsMultipleModes(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for multiple TLS modes, got nil")
 	}
-	if err.Error() != "multiple TLS modes enabled; choose at most one (AutoCert, Cert/Key, or DevTLS)" {
+	if err.Error() != errMultipleTLSModes {
 		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestValidateTLS_PlainHTTPWithAutoCertRejected(t *testing.T) {
+	s := New(Config{
+		TLS: TLSConfig{
+			PlainHTTP: true,
+			AutoCert:  true,
+			Domain:    "example.com",
+		},
+	})
+
+	err := s.validateTLS()
+	if err == nil {
+		t.Fatal("Expected error for PlainHTTP with AutoCert, got nil")
+	}
+	if err.Error() != errMultipleTLSModes {
+		t.Errorf("Unexpected error message: %v, want %q", err, errMultipleTLSModes)
 	}
 }
 
@@ -84,6 +103,115 @@ func TestValidateTLS_CertKeyMustBePaired(t *testing.T) {
 	}
 }
 
+func TestZeroTLSConfig_ServesHTTPSWithLocalCA(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := strings.Split(ln.Addr().String(), ":")[1]
+	ln.Close()
+
+	s := New(Config{
+		Port:   port,
+		Health: true,
+	})
+
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- s.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errChan:
+		t.Fatalf("Server failed to start: %v", err)
+	case <-time.After(1 * time.Second):
+	}
+
+	caDER, err := LocalCA()
+	if err != nil {
+		t.Fatalf("LocalCA: %v", err)
+	}
+	caCert, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatalf("ParseCertificate: %v", err)
+	}
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: roots,
+			},
+		},
+	}
+
+	resp, err := client.Get("https://127.0.0.1:" + port + "/health")
+	if err != nil {
+		t.Fatalf("HTTPS GET with RootCAs failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+}
+
+func TestPlainHTTP_ServesHTTP(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := strings.Split(ln.Addr().String(), ":")[1]
+	ln.Close()
+
+	s := New(Config{
+		Port:   port,
+		Health: true,
+		TLS: TLSConfig{
+			PlainHTTP: true,
+		},
+	})
+
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- s.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errChan:
+		t.Fatalf("Server failed to start: %v", err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	client := &http.Client{}
+
+	resp, err := client.Get("http://127.0.0.1:" + port + "/health")
+	if err != nil {
+		t.Fatalf("Plain HTTP GET failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+
+	respCA, err := client.Get("http://127.0.0.1:" + port + "/__webtyp/ca")
+	if err != nil {
+		t.Fatalf("GET /__webtyp/ca failed: %v", err)
+	}
+	defer respCA.Body.Close()
+
+	if respCA.StatusCode != http.StatusNotFound {
+		t.Errorf("CAPath status = %d, want 404 for PlainHTTP", respCA.StatusCode)
+	}
+}
+
 func TestTLS_CertFileKeyFile_Serves(t *testing.T) {
 	// 1. Generate self-signed cert
 	tmpDir := t.TempDir()
@@ -96,9 +224,9 @@ func TestTLS_CertFileKeyFile_Serves(t *testing.T) {
 		Subject: pkix.Name{
 			Organization: []string{"Test"},
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour),
-		KeyUsage:  x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().Add(time.Hour),
+		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 	}
@@ -165,10 +293,12 @@ func TestTLS_CertFileKeyFile_Serves(t *testing.T) {
 	}
 }
 
-func TestDevTLS_ServesWithoutBlockingOnTruststoreFailure(t *testing.T) {
+func TestLocalTLS_ServesWithoutBlockingOnTruststoreFailure(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
+
+	t.Setenv("HOME", t.TempDir())
 
 	// Find free port
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -183,9 +313,6 @@ func TestDevTLS_ServesWithoutBlockingOnTruststoreFailure(t *testing.T) {
 	s := New(Config{
 		Port:   port,
 		Health: true,
-		TLS: TLSConfig{
-			DevTLS: true,
-		},
 		Logger: func(args ...any) {
 			mu.Lock()
 			logs = append(logs, fmt.Sprint(args...))
@@ -217,11 +344,15 @@ func TestDevTLS_ServesWithoutBlockingOnTruststoreFailure(t *testing.T) {
 		mu.Lock()
 		currentLogs := append([]string(nil), logs...)
 		mu.Unlock()
-		t.Fatalf("DevTLS request failed: %v, logs: %v", err, currentLogs)
+		t.Fatalf("LocalTLS request failed: %v, logs: %v", err, currentLogs)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
+}
+
+func _unusedImportsCheck() {
+	_ = io.EOF
 }

@@ -31,9 +31,9 @@ wins — the tool never overrides code the user owns — but nothing generates i
 - **`middleware.go`**: Built-in `Gzip` and `NoCache` middlewares.
 - **`static.go`**: Static file serving from `PublicDir`.
 - **`enforce.go`**: RBAC enforcement based on `Requires` metadata.
-- **`tls.go` / `devcert.go` / `ca.go`**: AutoCert (Let's Encrypt), custom
-  Cert/Key, and `DevTLS`. See the TLS section below.
-- **`spki.go`**: `DevCertSPKI()`, the pin the development browser trusts.
+- **`tls.go` / `localcert.go` / `ca.go`**: AutoCert (Let's Encrypt), custom
+  Cert/Key, PlainHTTP, and the local CA default (`LocalCA`).
+- **`spki.go`**: `LocalCertSPKI()`, the pin the development browser trusts.
 - **`routes_endpoint.go`**: Optional JSON endpoint at `/_routes` listing all registered routes.
 - **`httpd.go`**: Core `Server` orchestrator.
 
@@ -56,24 +56,22 @@ The server follows a **secure-by-default** model where routes are private unless
 - **Static Assets**: Files served from `PublicDir` (e.g., WASM binaries, JS, CSS) are always public. They bypass the RBAC middleware.
 - **Root Path (`/`) in Development**: The internal strategy registers a default public route for `/` that serves `PublicDir/index.html` or a diagnostic message. This ensures that the frontend application is accessible immediately without manual RBAC configuration.
 
-## Development TLS
+## TLS: HTTPS by default
 
-`DevTLS` is on by default in development. Serving HTTP locally and HTTPS in
-production hides a class of bugs that only appear after deployment — `Secure`
-cookies, `SameSite=None`, HSTS, mixed content — and makes it impossible to test
-a PWA from a phone on the LAN.
+The zero value of `TLSConfig` serves HTTPS with the local certificate authority in development **and** production. Setting `PlainHTTP: true` is the only way to serve plain HTTP (e.g. when a proxy in front terminates TLS). A page served by `httpd` is always a secure context, on `localhost` and on a LAN.
 
-It generates a **two-level chain**, the same shape `mkcert` and Caddy's internal
-PKI use:
+The CA route (`/__webtyp/ca`) is mounted automatically by `httpd` whenever it serves the local CA.
 
-- **The CA** (`httpd/devcert.go`, `ensureDevCA`) — `IsCA: true`, `KeyUsageCertSign | KeyUsageCRLSign`,
+It generates a **two-level chain**, the same shape `mkcert` and Caddy's internal PKI use:
+
+- **The CA** (`httpd/localcert.go`, `ensureLocalCA`) — `IsCA: true`, `KeyUsageCertSign | KeyUsageCRLSign`,
   `MaxPathLen: 0`, no subject alternative names, long-lived. This is the file a
   device installs to trust the server.
-- **The leaf** (`httpd/devcert.go`, `ensureDevCert`) — signed by the CA, `IsCA: false`,
-  `serverAuth`, and a SAN set covering `localhost`, `127.0.0.1`, `::1` **and
+- **The leaf** (`httpd/localcert.go`, `ensureLocalCert`) — signed by the CA, `IsCA: false`,
+  `serverAuth`, and a SAN set covering `localhost`, the lowercased host computer name, `127.0.0.1`, `::1` **and
   every non-loopback IPv4 of the host's interfaces**. It is regenerated when
-  that address set changes, so a laptop moving between networks does not keep
-  presenting a certificate for an address it no longer has.
+  that address set changes or when machine name changes, and renews itself automatically
+  30 days before expiry without requiring a server restart.
 
 A single self-signed certificate cannot do this job: a leaf has `CA:FALSE`, and
 iOS and Android refuse to use it as a trust anchor — the device shows no error,
@@ -83,10 +81,10 @@ the page simply keeps failing after the user has followed every instruction.
 
 | Client | Mechanism | Trusts |
 |---|---|---|
-| The development browser | `--ignore-certificate-errors-spki-list` with `DevCertSPKI()` | exactly the **leaf's** public key |
+| The development browser | `--ignore-certificate-errors-spki-list` with `LocalCertSPKI()` | exactly the **leaf's** public key |
 | A phone on the LAN | installs the CA from `CAPath` (`/__webtyp/ca`) | anything the CA signs |
 
-`DevCertSPKI()` returns the **leaf's** SPKI hash, never the CA's. Chrome matches
+`LocalCertSPKI()` returns the **leaf's** SPKI hash, never the CA's. Chrome matches
 the flag against any certificate in the presented chain, so pinning the CA would
 appear to work — and would silently grant the browser trust in every certificate
 that CA ever signs, surviving a leaf rotation unnoticed.
@@ -98,7 +96,7 @@ On first generation the CA is also installed into the host's trust stores via
 `webtyp.com/devbrowser` — a second browser, `curl`, a native client — do not see
 a warning. The step is best-effort: on Linux it shells out through `sudo` and may
 prompt, and any failure is logged as a warning rather than aborting the listen.
-Setting `WEBTYP_DEVCERT_SKIP_TRUSTSTORE` to any non-empty value skips it
+Setting `WEBTYP_LOCALCERT_SKIP_TRUSTSTORE` to any non-empty value skips it
 entirely; test runners and CI set it. Nothing about serving TLS depends on it —
 the SPKI flag and `CAPath` still work when it is skipped or fails.
 
@@ -109,3 +107,5 @@ On iOS, installing a profile is **two steps** and the platform announces only
 the first: install it (Settings → Profile Downloaded), then enable it under
 Settings → General → About → Certificate Trust Settings. A profile installed but
 not trusted behaves exactly like no profile at all.
+
+Windows: open the downloaded file and install it in "Trusted Root Certification Authorities".
