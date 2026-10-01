@@ -87,23 +87,10 @@ func (s *internalStrategy) Start(wg *sync.WaitGroup) error {
 		Gzip:      true,
 		NoCache:   true,
 		Logger:    s.handler.log,
+		TLS:       httpd.TLSConfig{PlainHTTP: !s.handler.Https},
 	}
 	srvObj := httpd.New(hcfg)
 	r := srvObj.Router()
-
-	if s.handler.Https {
-		// Serve the development CA so a device on the LAN can install it and
-		// trust the dev certificate. It is an asset: public by construction.
-		r.PublicAsset(httpd.CAPath, func(ctx router.Context) {
-			der, err := httpd.DevCA()
-			if err != nil {
-				ctx.WriteStatus(http.StatusServiceUnavailable)
-				return
-			}
-			ctx.SetHeader("Content-Type", httpd.CADownloadContentType)
-			ctx.Write(der)
-		})
-	}
 
 	if len(s.handler.routes) > 0 {
 		for _, registerConfig := range s.handler.routes {
@@ -156,7 +143,7 @@ func (s *internalStrategy) Start(wg *sync.WaitGroup) error {
 
 	if s.handler.Https {
 		var certFile, keyFile string
-		certFile, keyFile, err = httpd.DevCertFiles()
+		certFile, keyFile, err = httpd.LocalCertFiles()
 		if err != nil {
 			s.handler.log("Internal Server dev-certificate error:", err)
 			s.running = false

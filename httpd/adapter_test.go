@@ -298,7 +298,7 @@ func TestHTTPRouterStreamAndSocket(t *testing.T) {
 }
 
 func TestHTTPRouterHandling(t *testing.T) {
-	srv := New(Config{})
+	srv := New(Config{TLS: TLSConfig{PlainHTTP: true}})
 	r := srv.Router()
 
 	// Register a handler that writes to context
@@ -331,7 +331,7 @@ func TestHTTPRouterHandling(t *testing.T) {
 }
 
 func TestHTTPRouterMiddleware(t *testing.T) {
-	srv := New(Config{})
+	srv := New(Config{TLS: TLSConfig{PlainHTTP: true}})
 	r := srv.Router()
 
 	callOrder := []string{}
@@ -418,7 +418,7 @@ func TestHTTPStreamer(t *testing.T) {
 }
 
 func TestHTTPRouterStreamExecution(t *testing.T) {
-	srv := New(Config{})
+	srv := New(Config{TLS: TLSConfig{PlainHTTP: true}})
 	r := srv.Router()
 
 	streamCalled := false
@@ -468,6 +468,7 @@ func TestHTTPSocketHandler(t *testing.T) {
 
 func TestHTTPRouterComplexScenario(t *testing.T) {
 	srv := New(Config{
+		TLS:       TLSConfig{PlainHTTP: true},
 		Authorize: func(u string, r model.Resource, a model.Action) bool { return true },
 	})
 	r := srv.Router()
@@ -568,7 +569,7 @@ func TestHTTPContextRemoteAddr(t *testing.T) {
 	var capturedOverrideAddr string
 	var capturedStaticRemoteAddr string
 
-	srv := New(Config{})
+	srv := New(Config{TLS: TLSConfig{PlainHTTP: true}})
 	r := srv.Router()
 
 	r.Get("/remote-addr", func(ctx router.Context) {
@@ -634,7 +635,7 @@ func TestHTTPContextRemoteAddr(t *testing.T) {
 }
 
 func TestHTTPStreamerDone(t *testing.T) {
-	srv := New(Config{})
+	srv := New(Config{TLS: TLSConfig{PlainHTTP: true}})
 	r := srv.Router()
 
 	returned := make(chan struct{})

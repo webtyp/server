@@ -34,6 +34,7 @@ func TestConcurrentRequests_NoRace(t *testing.T) {
 		Health:         true,
 		Gzip:           true,
 		RoutesEndpoint: true,
+		TLS:            TLSConfig{PlainHTTP: true},
 		Authn: func(next router.HandlerFunc) router.HandlerFunc {
 			return func(ctx router.Context) {
 				ctx.SetUserID(ctx.GetHeader("X-User"))
@@ -151,6 +152,7 @@ func TestConcurrentAuthorizerCalls(t *testing.T) {
 
 	cfg := Config{
 		Port: port,
+		TLS:  TLSConfig{PlainHTTP: true},
 		Authn: func(next router.HandlerFunc) router.HandlerFunc {
 			return func(ctx router.Context) {
 				ctx.SetUserID(ctx.GetHeader("X-User"))

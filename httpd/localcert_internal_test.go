@@ -16,8 +16,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"webtyp.com/router"
 )
 
 // fakeAddr is a net.Addr carrying a fixed CIDR, for stubbing interfaceAddrs.
@@ -71,47 +69,42 @@ func hasIP(ips []net.IP, want string) bool {
 	return false
 }
 
-// Test 7 — the development certificate carries localhost, both loopbacks, and
-// every non-loopback IPv4 of the host, read from interfaceAddrs.
-func TestDevCert_CoversLoopbackAndLAN(t *testing.T) {
+func TestLocalCert_CoversLoopbackAndLAN(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "192.168.1.50/24", "10.0.0.7/8", "127.0.0.1/8", "::1/128", "fe80::1/64")
 
-	certFile, _, err := ensureDevCert(nil)
+	certFile, _, err := ensureLocalCert(nil)
 	if err != nil {
-		t.Fatalf("ensureDevCert: %v", err)
+		t.Fatalf("ensureLocalCert: %v", err)
 	}
 	cert := loadCert(t, certFile)
 
 	foundLocalhost := false
 	for _, n := range cert.DNSNames {
-		if n == devCertHostname {
+		if n == localCertHostname {
 			foundLocalhost = true
 		}
 	}
 	if !foundLocalhost {
-		t.Errorf("DNSNames %v missing %q", cert.DNSNames, devCertHostname)
+		t.Errorf("DNSNames %v missing %q", cert.DNSNames, localCertHostname)
 	}
 	for _, want := range []string{"127.0.0.1", "::1", "192.168.1.50", "10.0.0.7"} {
 		if !hasIP(cert.IPAddresses, want) {
 			t.Errorf("IPAddresses %v missing %s", cert.IPAddresses, want)
 		}
 	}
-	// Link-local IPv6 is not an IPv4 LAN address and must not be added.
 	if hasIP(cert.IPAddresses, "fe80::1") {
 		t.Errorf("IPAddresses unexpectedly contains link-local fe80::1")
 	}
 }
 
-// Test 7 (cont.) — when the host's address set changes, the certificate is
-// regenerated rather than kept for an address that is gone.
-func TestDevCert_RegeneratesWhenAddressSetChanges(t *testing.T) {
+func TestLocalCert_RegeneratesWhenAddressSetChanges(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	stubInterfaceAddrs(t, "192.168.1.50/24")
-	certFile, _, err := ensureDevCert(nil)
+	certFile, _, err := ensureLocalCert(nil)
 	if err != nil {
-		t.Fatalf("ensureDevCert #1: %v", err)
+		t.Fatalf("ensureLocalCert #1: %v", err)
 	}
 	first := loadCert(t, certFile)
 	if !hasIP(first.IPAddresses, "192.168.1.50") {
@@ -119,8 +112,8 @@ func TestDevCert_RegeneratesWhenAddressSetChanges(t *testing.T) {
 	}
 
 	stubInterfaceAddrs(t, "192.168.9.9/24")
-	if _, _, err := ensureDevCert(nil); err != nil {
-		t.Fatalf("ensureDevCert #2: %v", err)
+	if _, _, err := ensureLocalCert(nil); err != nil {
+		t.Fatalf("ensureLocalCert #2: %v", err)
 	}
 	second := loadCert(t, certFile)
 
@@ -135,18 +128,18 @@ func TestDevCert_RegeneratesWhenAddressSetChanges(t *testing.T) {
 	}
 }
 
-func TestDevCert_ReusesCertWhenAddressSetUnchanged(t *testing.T) {
+func TestLocalCert_ReusesCertWhenAddressSetUnchanged(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "192.168.1.50/24")
 
-	certFile, _, err := ensureDevCert(nil)
+	certFile, _, err := ensureLocalCert(nil)
 	if err != nil {
-		t.Fatalf("ensureDevCert #1: %v", err)
+		t.Fatalf("ensureLocalCert #1: %v", err)
 	}
 	first := loadCert(t, certFile)
 
-	if _, _, err := ensureDevCert(nil); err != nil {
-		t.Fatalf("ensureDevCert #2: %v", err)
+	if _, _, err := ensureLocalCert(nil); err != nil {
+		t.Fatalf("ensureLocalCert #2: %v", err)
 	}
 	second := loadCert(t, certFile)
 
@@ -155,70 +148,66 @@ func TestDevCert_ReusesCertWhenAddressSetUnchanged(t *testing.T) {
 	}
 }
 
-// Test 6 — DevCertSPKI returns a stable 44-character base64 string for a fixed
-// certificate.
-func TestDevCertSPKI_StableBase64(t *testing.T) {
+func TestLocalCertSPKI_StableBase64(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "192.168.1.50/24")
 
-	if _, _, err := ensureDevCert(nil); err != nil {
-		t.Fatalf("ensureDevCert: %v", err)
+	if _, _, err := ensureLocalCert(nil); err != nil {
+		t.Fatalf("ensureLocalCert: %v", err)
 	}
 
-	first, err := DevCertSPKI()
+	first, err := LocalCertSPKI()
 	if err != nil {
-		t.Fatalf("DevCertSPKI: %v", err)
+		t.Fatalf("LocalCertSPKI: %v", err)
 	}
 	if len(first) != 44 {
 		t.Errorf("SPKI hash length = %d, want 44 (%q)", len(first), first)
 	}
-	second, err := DevCertSPKI()
+	second, err := LocalCertSPKI()
 	if err != nil {
-		t.Fatalf("DevCertSPKI (again): %v", err)
+		t.Fatalf("LocalCertSPKI (again): %v", err)
 	}
 	if first != second {
-		t.Errorf("DevCertSPKI not stable: %q != %q", first, second)
+		t.Errorf("LocalCertSPKI not stable: %q != %q", first, second)
 	}
 }
 
-// DevCA returns bytes that parse as an X.509 CA certificate.
-func TestDevCA_IsParseableDER(t *testing.T) {
+func TestLocalCA_IsParseableDER(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "192.168.1.50/24")
 
-	der, err := DevCA()
+	der, err := LocalCA()
 	if err != nil {
-		t.Fatalf("DevCA: %v", err)
+		t.Fatalf("LocalCA: %v", err)
 	}
 	caCert, err := x509.ParseCertificate(der)
 	if err != nil {
-		t.Fatalf("DevCA did not return valid DER: %v", err)
+		t.Fatalf("LocalCA did not return valid DER: %v", err)
 	}
 	if !caCert.IsCA {
-		t.Error("DevCA certificate IsCA = false, want true")
+		t.Error("LocalCA certificate IsCA = false, want true")
 	}
 	if caCert.KeyUsage&x509.KeyUsageCertSign == 0 {
-		t.Error("DevCA certificate missing KeyUsageCertSign")
+		t.Error("LocalCA certificate missing KeyUsageCertSign")
 	}
-	dir, _ := devCertDir()
-	if _, err := os.Stat(filepath.Join(dir, devCAFilename)); err != nil {
+	dir, _ := localCertDir()
+	if _, err := os.Stat(filepath.Join(dir, localCAFilename)); err != nil {
 		t.Fatalf("expected ca cert on disk: %v", err)
 	}
 }
 
-// Stage 2 test — DevCertSPKI returns the leaf's SPKI hash and differs from the CA's.
-func TestDevCertSPKI_PointsToLeafNotCA(t *testing.T) {
+func TestLocalCertSPKI_PointsToLeafNotCA(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "192.168.1.50/24")
 
-	spki, err := DevCertSPKI()
+	spki, err := LocalCertSPKI()
 	if err != nil {
-		t.Fatalf("DevCertSPKI: %v", err)
+		t.Fatalf("LocalCertSPKI: %v", err)
 	}
 
-	leafDER, err := devCertLeafDER()
+	leafDER, err := localCertLeafDER()
 	if err != nil {
-		t.Fatalf("devCertLeafDER: %v", err)
+		t.Fatalf("localCertLeafDER: %v", err)
 	}
 	leafCert, err := x509.ParseCertificate(leafDER)
 	if err != nil {
@@ -227,9 +216,9 @@ func TestDevCertSPKI_PointsToLeafNotCA(t *testing.T) {
 	leafSum := sha256.Sum256(leafCert.RawSubjectPublicKeyInfo)
 	expectedLeafSPKI := base64.StdEncoding.EncodeToString(leafSum[:])
 
-	caDER, err := DevCA()
+	caDER, err := LocalCA()
 	if err != nil {
-		t.Fatalf("DevCA: %v", err)
+		t.Fatalf("LocalCA: %v", err)
 	}
 	caCert, err := x509.ParseCertificate(caDER)
 	if err != nil {
@@ -239,16 +228,14 @@ func TestDevCertSPKI_PointsToLeafNotCA(t *testing.T) {
 	caSPKI := base64.StdEncoding.EncodeToString(caSum[:])
 
 	if spki != expectedLeafSPKI {
-		t.Errorf("DevCertSPKI() = %q, want leaf SPKI %q", spki, expectedLeafSPKI)
+		t.Errorf("LocalCertSPKI() = %q, want leaf SPKI %q", spki, expectedLeafSPKI)
 	}
 	if spki == caSPKI {
-		t.Errorf("DevCertSPKI() unexpectedly equal to CA SPKI %q", caSPKI)
+		t.Errorf("LocalCertSPKI() unexpectedly equal to CA SPKI %q", caSPKI)
 	}
 }
 
-// Stage 3 consumer-shaped test — starts server with DevTLS, fetches /__webtyp/ca,
-// and asserts all 4 required criteria.
-func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
+func TestLocalTLS_CAEndpointConsumerShaped(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	stubInterfaceAddrs(t, "127.0.0.1/8")
 
@@ -262,20 +249,6 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 	s := New(Config{
 		Port:   port,
 		Health: true,
-		TLS: TLSConfig{
-			DevTLS: true,
-		},
-	})
-
-	// Serve CAPath explicitly on s.Router() as strategies.go / maingen.go do
-	s.Router().PublicAsset(CAPath, func(c router.Context) {
-		der, err := DevCA()
-		if err != nil {
-			c.WriteStatus(http.StatusServiceUnavailable)
-			return
-		}
-		c.SetHeader("Content-Type", CADownloadContentType)
-		c.Write(der)
 	})
 
 	errChan := make(chan error, 1)
@@ -306,7 +279,6 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
 
-	// Assertion 4: response Content-Type is application/x-x509-ca-cert.
 	ct := resp.Header.Get("Content-Type")
 	if ct != CADownloadContentType {
 		t.Errorf("Content-Type = %q, want %q", ct, CADownloadContentType)
@@ -317,13 +289,11 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 		t.Fatalf("reading response body: %v", err)
 	}
 
-	// Assertion 1: parses as an X.509 certificate.
 	caCert, err := x509.ParseCertificate(caBytes)
 	if err != nil {
 		t.Fatalf("failed to parse CA certificate from /__webtyp/ca: %v", err)
 	}
 
-	// Assertion 2: IsCA is true and KeyUsage includes KeyUsageCertSign.
 	if !caCert.IsCA {
 		t.Error("CA certificate IsCA = false, want true")
 	}
@@ -331,7 +301,6 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 		t.Error("CA certificate missing KeyUsageCertSign")
 	}
 
-	// Verify openssl basicConstraints output (Acceptance Criteria 2 & 3)
 	if openssl, err := exec.LookPath("openssl"); err == nil {
 		tmpDir := t.TempDir()
 		caPath := filepath.Join(tmpDir, "ca.crt")
@@ -351,7 +320,6 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 		}
 	}
 
-	// Assertion 3: leaf presented by TLS handshake verifies against CA using x509.CertPool.
 	if resp.TLS == nil || len(resp.TLS.PeerCertificates) == 0 {
 		t.Fatal("no peer certificates presented in TLS handshake")
 	}
@@ -364,11 +332,107 @@ func TestDevTLS_CAEndpointConsumerShaped(t *testing.T) {
 	roots.AddCert(caCert)
 
 	opts := x509.VerifyOptions{
-		Roots:     roots,
-		DNSName:   "localhost",
+		Roots:       roots,
+		DNSName:     "localhost",
 		CurrentTime: time.Now(),
 	}
 	if _, err := leafCert.Verify(opts); err != nil {
 		t.Errorf("leaf certificate failed to verify against CA: %v", err)
+	}
+}
+
+func TestLocalCert_IncludesHostname(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	prevHostname := hostname
+	hostname = func() (string, error) {
+		return "Servidor", nil
+	}
+	t.Cleanup(func() { hostname = prevHostname })
+
+	certFile, _, err := ensureLocalCert(nil)
+	if err != nil {
+		t.Fatalf("ensureLocalCert: %v", err)
+	}
+	cert := loadCert(t, certFile)
+
+	foundServidor := false
+	for _, name := range cert.DNSNames {
+		if name == "servidor" {
+			foundServidor = true
+			break
+		}
+	}
+	if !foundServidor {
+		t.Errorf("DNSNames %v missing %q", cert.DNSNames, "servidor")
+	}
+}
+
+func TestLocalCert_RenewsBeforeExpiry(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	stubInterfaceAddrs(t, "127.0.0.1/8")
+
+	lc := &localCert{}
+	tlsCert1, err := lc.get(nil)
+	if err != nil {
+		t.Fatalf("first get: %v", err)
+	}
+	x509Cert1, err := x509.ParseCertificate(tlsCert1.Certificate[0])
+	if err != nil {
+		t.Fatalf("parsing cert 1: %v", err)
+	}
+
+	prevNow := now
+	// Stub now to NotAfter − 29 days (which is inside localCertRenewBefore = 30 days window)
+	now = func() time.Time {
+		return x509Cert1.NotAfter.Add(-29 * 24 * time.Hour)
+	}
+	t.Cleanup(func() { now = prevNow })
+
+	tlsCert2, err := lc.get(nil)
+	if err != nil {
+		t.Fatalf("second get: %v", err)
+	}
+	x509Cert2, err := x509.ParseCertificate(tlsCert2.Certificate[0])
+	if err != nil {
+		t.Fatalf("parsing cert 2: %v", err)
+	}
+
+	if !x509Cert2.NotAfter.After(x509Cert1.NotAfter) {
+		t.Errorf("expected renewed cert NotAfter (%v) to be after original NotAfter (%v)", x509Cert2.NotAfter, x509Cert1.NotAfter)
+	}
+}
+
+func TestLocalCert_ReusesFreshLeaf(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	stubInterfaceAddrs(t, "127.0.0.1/8")
+
+	lc := &localCert{}
+	tlsCert1, err := lc.get(nil)
+	if err != nil {
+		t.Fatalf("first get: %v", err)
+	}
+	x509Cert1, err := x509.ParseCertificate(tlsCert1.Certificate[0])
+	if err != nil {
+		t.Fatalf("parsing cert 1: %v", err)
+	}
+
+	prevNow := now
+	startTime := now()
+	now = func() time.Time {
+		return startTime.Add(10 * time.Minute)
+	}
+	t.Cleanup(func() { now = prevNow })
+
+	tlsCert2, err := lc.get(nil)
+	if err != nil {
+		t.Fatalf("second get: %v", err)
+	}
+	x509Cert2, err := x509.ParseCertificate(tlsCert2.Certificate[0])
+	if err != nil {
+		t.Fatalf("parsing cert 2: %v", err)
+	}
+
+	if x509Cert1.SerialNumber.Cmp(x509Cert2.SerialNumber) != 0 {
+		t.Errorf("expected same serial number, got %v and %v", x509Cert1.SerialNumber, x509Cert2.SerialNumber)
 	}
 }

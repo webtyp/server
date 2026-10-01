@@ -91,7 +91,7 @@ func main() {
 
 `webtyp.com/server/httpd` implements `router.Router`/`router.Context` on top of
 `net/http`, with production batteries built in: gzip, no-cache headers, static file
-serving, TLS (AutoCert/custom cert/DevTLS), a `/health` endpoint, an optional `/_routes`
+serving, TLS (AutoCert/custom cert/PlainHTTP, default: local CA), a `/health` endpoint, an optional `/_routes`
 JSON listing, and closed-by-default RBAC enforcement (`Config.Authn` for global identity,
 `Config.Authorize` for per-route `Requires(resource, action)` checks, and `Config.Policy`
 to report which roles hold each route's required permission; `Authorize` answers "may this user do this?",
@@ -117,7 +117,7 @@ for design details.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — what the `httpd` subpackage is and why:
   the generated server entry point, RBAC enforcement, and the development TLS chain.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — decisions and rejected alternatives, including
-  [why the dev certificate uses `smallstep/truststore` and not `mkcert`](docs/DESIGN.md#why-the-dev-certificate-uses-smallsteptruststore-and-not-mkcert).
+  [why the dev certificate uses `smallstep/truststore` and not `mkcert`](docs/DESIGN.md#why-the-local-certificate-uses-smallsteptruststore-and-not-mkcert).
 - [`docs/handoff-protocol.md`](docs/handoff-protocol.md) — the graceful module-swap
   sequence used when a WASM module is recompiled while the server is running.
 

@@ -57,7 +57,7 @@ func TestGenerateMain_ParsesAndImportsRoutes(t *testing.T) {
 	got, err := server.GenerateMain(root, modulePath, server.MainConfig{
 		Port:      "8080",
 		PublicDir: "web/public",
-		DevTLS:    true,
+		PlainHTTP: false,
 	})
 	if err != nil {
 		t.Fatalf("GenerateMain: %v", err)
@@ -83,6 +83,35 @@ func TestGenerateMain_ParsesAndImportsRoutes(t *testing.T) {
 	src, _ := os.ReadFile(got)
 	if !strings.Contains(string(src), "DO NOT EDIT") {
 		t.Errorf("generated main missing the generated-code marker")
+	}
+}
+
+func TestGenerateMain_PlainHTTPAndNoCARoute(t *testing.T) {
+	root := t.TempDir()
+	const modulePath = "example.com/app"
+	writeModule(t, root, modulePath)
+	writeRoutes(t, root, "package routes\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n")
+
+	got, err := server.GenerateMain(root, modulePath, server.MainConfig{
+		Port:      "8080",
+		PublicDir: "web/public",
+		PlainHTTP: false,
+	})
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
+
+	src, err := os.ReadFile(got)
+	if err != nil {
+		t.Fatalf("reading generated main: %v", err)
+	}
+
+	code := string(src)
+	if !strings.Contains(code, "PlainHTTP: false") {
+		t.Errorf("generated main does not contain PlainHTTP: false:\n%s", code)
+	}
+	if strings.Contains(code, "CAPath") {
+		t.Errorf("generated main unexpectedly contains CAPath:\n%s", code)
 	}
 }
 

@@ -67,7 +67,7 @@ func (h *ServerHandler) ensureServerMain(force bool) error {
 	cfg := MainConfig{
 		Port:      h.Port(),
 		PublicDir: h.PublicDir,
-		DevTLS:    h.Https,
+		PlainHTTP: !h.Https,
 	}
 	if _, err := GenerateMain(h.AppRootDir, readModulePath(h.AppRootDir), cfg); err != nil {
 		return err

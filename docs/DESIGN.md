@@ -11,7 +11,18 @@ document can stay short.
 
 ---
 
-## Why the dev certificate uses `smallstep/truststore` and not `mkcert`
+## Why HTTPS is the zero value
+
+A service worker, the Origin Private File System and `navigator.storage.persist()` exist only in a *secure context* (HTTPS, or `localhost`). Previously `httpd.Config` with a zero `TLS` field served plain HTTP. A clinic opening its own server as `http://192.168.1.20:8080` got a page with no service worker and no OPFS. The fix is that the **zero value is HTTPS**, using the local certificate authority (`LocalCA`). Plain HTTP becomes an explicit opt-out (`PlainHTTP: true`).
+
+Prior art comparison:
+- **Caddy** serves HTTPS by default for every site; for hosts that cannot get a public certificate (`localhost`, IPs, internal names) it uses its internal CA, installs it in the system trust store, and HTTP only happens when the address is written with `http://` explicitly.
+- **mkcert** uses the same two-level chain but is a separate tool the developer runs by hand; we generate in-process automatically.
+- **Go `net/http`** and most frameworks default to plain HTTP and leave TLS to a proxy. That default is what produced clinic servers without a secure context; we follow Caddy.
+
+---
+
+## Why the local certificate uses `smallstep/truststore` and not `mkcert`
 
 ### The situation this comes from
 
@@ -32,7 +43,7 @@ behind it:
   HTTPS in production hides bugs that only surface after deploying — `Secure`
   cookies that never get sent, `SameSite=None`, HSTS, mixed content — and because
   a phone on the same Wi-Fi cannot install a PWA from an `http://` address. The
-  full reasoning lives in [ARCHITECTURE.md → Development TLS](ARCHITECTURE.md#development-tls).
+  full reasoning lives in [ARCHITECTURE.md → TLS: HTTPS by default](ARCHITECTURE.md#tls-https-by-default).
 - **Why no warning?** Normally a certificate a program made for itself produces
   *"Your connection is not private"* in every browser. Avoiding that is what
   brought the `github.com/smallstep/truststore` dependency into
@@ -57,9 +68,9 @@ sentence is the whole problem this dependency solves.
 
 `httpd` builds the certificates itself, with nothing but `crypto/x509` from the
 standard library, all of it in
-[`../httpd/devcert.go`](../httpd/devcert.go): a CA called `WebTyp Dev CA`, and a
+[`../httpd/localcert.go`](../httpd/localcert.go): a CA called `WebTyp Local CA`, and a
 server certificate signed by it whose list of valid addresses covers `localhost`,
-the loopback addresses and every LAN address the machine currently has. Both land
+the computer host name, loopback addresses and every LAN address the machine currently has. Both land
 in `~/.webtyp/httpd/certs`.
 
 The standard library stops there. **Adding a CA to the operating system's trust
@@ -116,7 +127,7 @@ differs is the shape it is delivered in:
    about all of that; adopting it would mean fighting it, not reusing it. The one
    piece genuinely missing is "install this CA," and that is the entirety of what
    `truststore` does — the codebase calls exactly **one** function from it,
-   [`truststore.Install`](../httpd/devcert.go#L173).
+   [`truststore.Install`](../httpd/localcert.go#L173).
 
 3. **Writing it again is not worth it.** It is on the order of a thousand lines
    of per-platform code — NSS databases, the Java keystore, Windows syscalls —
@@ -132,7 +143,7 @@ differs is the shape it is delivered in:
 - **On Linux the install runs `sudo`** internally and may ask for your password
   the first time. Because of that the step is best-effort: a failure is logged as
   a warning and the server keeps going. Setting the environment variable
-  `WEBTYP_DEVCERT_SKIP_TRUSTSTORE` to any value skips it altogether — the test
+  `WEBTYP_LOCALCERT_SKIP_TRUSTSTORE` to any value skips it altogether — the test
   runner and CI set it, so `gotest` never stops waiting for a password prompt.
   TLS itself never depends on this step.
 

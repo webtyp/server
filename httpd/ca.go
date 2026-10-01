@@ -1,19 +1,35 @@
 package httpd
 
-import "errors"
+import (
+	"net/http"
 
-// CAPath is where the development certificate authority is served so a device on
-// the LAN can install it and trust the dev server. The internal dev server and
-// the generated server main both serve DevCA() here with CADownloadContentType.
+	"webtyp.com/router"
+)
+
+// CAPath is where the local certificate authority is served so a device on
+// the LAN can install it and trust the server. httpd serves it automatically
+// whenever it serves the local CA (the zero TLSConfig).
 //
 // iOS needs two steps and hints at neither: install the profile (Settings →
 // Profile Downloaded), then enable it under Settings → General → About →
 // Certificate Trust Settings. A profile installed but not trusted behaves
 // exactly like no profile at all.
+//
+// Windows: open the downloaded file and install it in "Trusted Root
+// Certification Authorities".
 const CAPath = "/__webtyp/ca"
 
 // CADownloadContentType is the MIME type iOS and Android expect for a CA
 // certificate offered for installation.
 const CADownloadContentType = "application/x-x509-ca-cert"
 
-var errDevCertDecode = errors.New("httpd: development certificate is not valid PEM")
+func serveLocalCA(c router.Context) {
+	der, err := LocalCA()
+	if err != nil {
+		c.WriteStatus(http.StatusServiceUnavailable)
+		return
+	}
+	c.SetHeader("Content-Type", CADownloadContentType)
+	c.WriteStatus(http.StatusOK)
+	c.Write(der)
+}
