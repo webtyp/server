@@ -81,10 +81,8 @@ func (s *Server) listenAndServe(srv *http.Server) error {
 		return srv.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
 	case tlsPlain:
 		return srv.ListenAndServe()
-	case tlsLocal:
-		srv.TLSConfig = &tls.Config{GetCertificate: s.localCert.get}
-		return srv.ListenAndServeTLS("", "")
-	default:
-		return srv.ListenAndServe()
 	}
+	// tlsLocal, the zero value: never falls back to plain HTTP.
+	srv.TLSConfig = &tls.Config{GetCertificate: s.localCert.get}
+	return srv.ListenAndServeTLS("", "")
 }
