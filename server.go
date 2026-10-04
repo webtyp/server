@@ -67,7 +67,6 @@ type ServerHandler struct {
 	portMu                 sync.RWMutex // protects AppPort (read from goroutines started by strategies)
 	executionInternal      bool         // true = embedded server (internal), false = external process
 	onLog                  func(message ...any)
-	openBrowserOnce        sync.Once
 
 	// Internal route list
 	routes []func(router.Router)
@@ -86,7 +85,6 @@ type Config struct {
 	DisableGlobalCleanup        bool                 // If true, disables global cleanup in gorun during restarts
 	Logger                      func(message ...any) // Logger function
 	ExitChan                    chan bool            // Global channel to signal shutdown
-	OpenBrowser                 func(port string, https bool)
 	Store                       Store                    // Persistent storage for modes
 	UI                          UI                       // UI for refresh notifications
 	BeforeExternalServerStart   func() error             // Called synchronously before external strategy starts
@@ -187,12 +185,6 @@ func (h *ServerHandler) SetLogger(fn func(...any)) *ServerHandler {
 // SetExitChan sets the exit channel
 func (h *ServerHandler) SetExitChan(ch chan bool) *ServerHandler {
 	h.Config.ExitChan = ch
-	return h
-}
-
-// SetOpenBrowser sets the open browser function
-func (h *ServerHandler) SetOpenBrowser(fn func(port string, https bool)) *ServerHandler {
-	h.Config.OpenBrowser = fn
 	return h
 }
 

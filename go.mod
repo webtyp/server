@@ -10,6 +10,7 @@ require (
 	webtyp.com/gorun v0.0.27
 	webtyp.com/json v0.5.27
 	webtyp.com/model v0.1.9
+	webtyp.com/pwa v0.1.1
 	webtyp.com/router v0.3.0
 )
 
@@ -17,5 +18,4 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	howett.net/plist v1.0.0 // indirect
-	webtyp.com/pwa v0.1.1 // indirect
 )
