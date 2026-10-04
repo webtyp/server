@@ -138,7 +138,7 @@ func TestLaDecisionSeRegistraConLaRutaCompleta(t *testing.T) {
 		},
 		{
 			"no routes, no main", false, server.LogInternalNoRoutes,
-			func(root string) string { return filepath.Join(root, "routes", "routes.go") },
+			func(root string) string { return filepath.Join(root, "config", "routes.go") },
 		},
 	}
 

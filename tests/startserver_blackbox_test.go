@@ -44,7 +44,7 @@ func TestCreateTemplateServerGeneratesFile(t *testing.T) {
 	h.SetLogger(logger)
 
 	// Ensure external file doesn't exist initially
-	target := filepath.Join(h.AppRootDir, server.GeneratedMainDir, "main.go")
+	target := filepath.Join(h.AppRootDir, server.GeneratedMainDir, server.GeneratedMainFilename)
 	if _, err := os.Stat(target); err == nil {
 		t.Fatalf("expected no external server file at %s", target)
 	}

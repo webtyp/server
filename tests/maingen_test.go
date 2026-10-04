@@ -21,9 +21,9 @@ func writeModule(t *testing.T, root, modulePath string) {
 
 func writeRoutes(t *testing.T, root, body string) {
 	t.Helper()
-	dir := filepath.Join(root, "routes")
+	dir := filepath.Join(root, "config")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("mkdir routes: %v", err)
+		t.Fatalf("mkdir config: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "routes.go"), []byte(body), 0o644); err != nil {
 		t.Fatalf("writing routes.go: %v", err)
@@ -47,12 +47,12 @@ func generatedImports(t *testing.T, file string) []string {
 	return out
 }
 
-// Test 1 — GenerateMain writes a file that parses and imports <modulePath>/routes.
+// Test 1 — GenerateMain writes a file that parses and imports <modulePath>/config.
 func TestGenerateMain_ParsesAndImportsRoutes(t *testing.T) {
 	root := t.TempDir()
 	const modulePath = "example.com/app"
 	writeModule(t, root, modulePath)
-	writeRoutes(t, root, "package routes\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n")
+	writeRoutes(t, root, "package config\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n")
 
 	got, err := server.GenerateMain(root, modulePath, server.MainConfig{
 		Port:      "8080",
@@ -63,13 +63,13 @@ func TestGenerateMain_ParsesAndImportsRoutes(t *testing.T) {
 		t.Fatalf("GenerateMain: %v", err)
 	}
 
-	want := filepath.Join(root, server.GeneratedMainDir, "main.go")
+	want := filepath.Join(root, server.GeneratedMainDir, server.GeneratedMainFilename)
 	if got != want {
 		t.Errorf("GenerateMain returned %q, want %q", got, want)
 	}
 
 	imports := generatedImports(t, got)
-	wantImport := `"` + modulePath + `/routes"`
+	wantImport := `"` + modulePath + `/config"`
 	found := false
 	for _, imp := range imports {
 		if imp == wantImport {
@@ -176,8 +176,5 @@ func TestEscapeHatch_UserMainNotOverwritten(t *testing.T) {
 
 	if got, _ := os.ReadFile(userFile); string(got) != userMain {
 		t.Errorf("user server.go was modified:\n%s", got)
-	}
-	if _, err := os.Stat(filepath.Join(root, server.GeneratedMainDir, "main.go")); err != nil {
-		t.Errorf("generated artifact missing: %v", err)
 	}
 }

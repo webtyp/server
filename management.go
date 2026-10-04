@@ -14,8 +14,8 @@ import (
 // drove the decision.
 const (
 	LogExternalUserMain  = "External mode: user-written server main at"
-	LogExternalGenerated = "External mode: routes/routes.go present, generated main from"
-	LogInternalNoRoutes  = "Internal mode: no routes/routes.go and no server main, checked"
+	LogExternalGenerated = "External mode: config/routes.go present, generated main from"
+	LogInternalNoRoutes  = "Internal mode: no config/routes.go and no server main, checked"
 )
 
 // StartServer initiates the server using the current strategy (In-Memory or External)

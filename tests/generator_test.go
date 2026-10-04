@@ -51,11 +51,11 @@ func safeTestLogger(t *testing.T) func(...any) {
 // HasRoutes(root) is true and the generated-main path is exercised.
 func writeRoutesFile(t *testing.T, root string) {
 	t.Helper()
-	dir := filepath.Join(root, "routes")
+	dir := filepath.Join(root, "config")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("creating routes dir: %v", err)
+		t.Fatalf("creating config dir: %v", err)
 	}
-	const src = "package routes\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n"
+	const src = "package config\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n"
 	if err := os.WriteFile(filepath.Join(dir, "routes.go"), []byte(src), 0o644); err != nil {
 		t.Fatalf("writing routes.go: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestGenerateCreatesFile(t *testing.T) {
 	h := newTestHandler(t, sourceDir, outputDir, tmp)
 	writeRoutesFile(t, tmp)
 
-	target := filepath.Join(tmp, server.GeneratedMainDir, "main.go")
+	target := filepath.Join(tmp, server.GeneratedMainDir, server.GeneratedMainFilename)
 	if _, err := os.Stat(target); err == nil {
 		t.Fatalf("expected no existing file at %s", target)
 	}

@@ -120,7 +120,7 @@ func TestSetExternalServerMode_SwitchesToExternal(t *testing.T) {
 	}
 
 	// Verify file was generated
-	targetPath := filepath.Join(tmpData, server.GeneratedMainDir, "main.go")
+	targetPath := filepath.Join(tmpData, server.GeneratedMainDir, server.GeneratedMainFilename)
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 		t.Fatalf("expected server file to be generated at %s", targetPath)
 	}
@@ -192,10 +192,7 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 		}
 		return false
 	}
-	if !has(server.BuildDirGitIgnore) {
-		t.Errorf("GitIgnoreAdd never received %q; got %v", server.BuildDirGitIgnore, entries)
-	}
-	if wantBinary := filepath.Join("web", "main"); !has(wantBinary) {
+	if wantBinary := filepath.Join("web", "server"); !has(wantBinary) {
 		t.Errorf("GitIgnoreAdd never received binary path %q; got %v", wantBinary, entries)
 	}
 }

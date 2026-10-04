@@ -364,7 +364,7 @@ func newExternalStrategy(h *ServerHandler) *externalStrategy {
 		Logger:               h.log,
 		KillAllOnStop:        true,
 		DisableGlobalCleanup: h.Config.DisableGlobalCleanup,
-		WorkingDir:           filepath.Join(h.AppRootDir, h.OutputDir),
+		WorkingDir:           h.AppRootDir,
 		EnvFile:              filepath.Join(h.AppRootDir, ".env"),
 	})
 
