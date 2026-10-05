@@ -109,3 +109,12 @@ Settings → General → About → Certificate Trust Settings. A profile install
 not trusted behaves exactly like no profile at all.
 
 Windows: open the downloaded file and install it in "Trusted Root Certification Authorities".
+
+## HTTP/2 and Streaming (SSE, WebSockets)
+
+Long-lived connections (such as SSE streams or WebSockets registered via `r.Stream(...)`) have specialized transport requirements:
+
+1. **WriteTimeout Bypass**: Go's `http.Server.WriteTimeout` is 15s by default. In `httpd`, stream handlers invoke `http.NewResponseController(w).SetWriteDeadline(time.Time{})` to disable this timeout for the stream's lifetime, preventing abrupt connection terminations.
+2. **Hop-by-Hop Header Sanitization**: In HTTP/2 (RFC 9113 §8.2.2), connection-specific headers (`Connection`, `Keep-Alive`, `Proxy-Connection`, `Transfer-Encoding`, `Upgrade`) are strictly prohibited and cause `PROTOCOL_ERROR`. `httpd` automatically filters these headers when `r.ProtoMajor >= 2`.
+3. **Gzip Bypass**: Any response with `Content-Type: text/event-stream` bypasses gzip compression to prevent buffering delays and HTTP/2 framing issues.
+

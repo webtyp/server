@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"webtyp.com/json"
 	"webtyp.com/model"
@@ -58,6 +59,15 @@ func (c *httpContext) GetHeader(key string) string {
 }
 
 func (c *httpContext) SetHeader(key, value string) {
+	if c.r != nil && c.r.ProtoMajor >= 2 {
+		if strings.EqualFold(key, "Connection") ||
+			strings.EqualFold(key, "Keep-Alive") ||
+			strings.EqualFold(key, "Proxy-Connection") ||
+			strings.EqualFold(key, "Transfer-Encoding") ||
+			strings.EqualFold(key, "Upgrade") {
+			return
+		}
+	}
 	c.w.Header().Set(key, value)
 }
 
@@ -164,8 +174,10 @@ type httpStreamer struct {
 }
 
 func (s *httpStreamer) Flush() {
-	if f, ok := s.w.(http.Flusher); ok {
-		f.Flush()
+	if err := http.NewResponseController(s.w).Flush(); err != nil {
+		if f, ok := s.w.(http.Flusher); ok {
+			f.Flush()
+		}
 	}
 }
 
@@ -290,6 +302,8 @@ func (r *httpRouter) register(route *httpRoute) {
 				if hfunc == nil && route.sh != nil {
 					hfunc = func(ctx router.Context) {
 						if s, ok := ctx.(*httpContext); ok {
+							rc := http.NewResponseController(s.w)
+							_ = rc.SetWriteDeadline(time.Time{})
 							route.sh(&httpStreamer{httpContext: s})
 						}
 					}

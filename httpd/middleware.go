@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"net/http"
 	"strings"
+	"time"
 
 	"webtyp.com/router"
 )
@@ -29,6 +30,9 @@ func (w *lazyGzipWriter) decide() {
 	w.decided = true
 	if w.Header().Get("Content-Encoding") != "" {
 		return // the handler already encoded the body: pass it through untouched
+	}
+	if strings.HasPrefix(w.Header().Get("Content-Type"), "text/event-stream") {
+		return // SSE must not be gzipped: causes buffering, delays, and HTTP/2 stream errors
 	}
 	w.Header().Set("Content-Encoding", "gzip")
 	w.gz = gzip.NewWriter(w.ResponseWriter)
@@ -60,6 +64,10 @@ func (w *lazyGzipWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (w *lazyGzipWriter) SetWriteDeadline(deadline time.Time) error {
+	return http.NewResponseController(w.ResponseWriter).SetWriteDeadline(deadline)
 }
 
 func (w *lazyGzipWriter) Unwrap() http.ResponseWriter {

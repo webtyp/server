@@ -684,3 +684,37 @@ func TestHTTPStreamerDone(t *testing.T) {
 		t.Fatalf("expected handler to exit after client cancel within 2s")
 	}
 }
+
+func TestHTTP2_HopByHopHeadersFiltered(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.ProtoMajor = 2
+	w := httptest.NewRecorder()
+	ctx := &httpContext{w: w, r: req}
+
+	ctx.SetHeader("Connection", "keep-alive")
+	ctx.SetHeader("Keep-Alive", "timeout=5")
+	ctx.SetHeader("X-Custom", "allowed")
+
+	if got := w.Header().Get("Connection"); got != "" {
+		t.Errorf("Connection header must be stripped on HTTP/2, got %q", got)
+	}
+	if got := w.Header().Get("Keep-Alive"); got != "" {
+		t.Errorf("Keep-Alive header must be stripped on HTTP/2, got %q", got)
+	}
+	if got := w.Header().Get("X-Custom"); got != "allowed" {
+		t.Errorf("X-Custom header must be retained, got %q", got)
+	}
+}
+
+func TestStream_GzipBypassedForEventStream(t *testing.T) {
+	w := httptest.NewRecorder()
+	lw := &lazyGzipWriter{ResponseWriter: w}
+
+	lw.Header().Set("Content-Type", "text/event-stream")
+	lw.WriteHeader(http.StatusOK)
+
+	if got := w.Header().Get("Content-Encoding"); got != "" {
+		t.Errorf("text/event-stream must not be gzipped, got Content-Encoding: %q", got)
+	}
+}
+
