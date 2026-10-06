@@ -9,7 +9,7 @@ require (
 	webtyp.com/gobuild v0.0.28
 	webtyp.com/gorun v0.0.27
 	webtyp.com/json v0.5.27
-	webtyp.com/model v0.1.9
+	webtyp.com/model v0.2.2
 	webtyp.com/pwa v0.1.1
 	webtyp.com/router v0.3.2
 )
