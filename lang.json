@@ -1,0 +1,8 @@
+{
+  "languages": ["es", "zh", "hi", "ar", "pt", "fr", "de", "ru"],
+  "keys": {
+    "External mode: config/routes.go present, generated main from": ["Modo externo: existe config/routes.go, main generado desde", "外部模式：存在 config/routes.go，main 生成自", "बाहरी मोड: config/routes.go मौजूद है, main यहाँ से बनाया गया", "الوضع الخارجي: يوجد config/routes.go، تم إنشاء main من", "Modo externo: config/routes.go presente, main gerado a partir de", "Mode externe : config/routes.go présent, main généré depuis", "Externer Modus: config/routes.go vorhanden, main generiert aus", "Внешний режим: есть config/routes.go, main сгенерирован из"],
+    "External mode: user-written server main at": ["Modo externo: main de servidor escrito por el usuario en", "外部模式：用户编写的服务器 main 位于", "बाहरी मोड: उपयोगकर्ता द्वारा लिखा गया सर्वर main यहाँ", "الوضع الخارجي: main الخادم الذي كتبه المستخدم في", "Modo externo: main do servidor escrito pelo usuário em", "Mode externe : main serveur écrit par l'utilisateur dans", "Externer Modus: vom Benutzer geschriebenes Server-main in", "Внешний режим: main сервера, написанный пользователем, в"],
+    "Internal mode: no config/routes.go and no server main, checked": ["Modo interno: sin config/routes.go ni main de servidor, revisado", "内部模式：没有 config/routes.go 也没有服务器 main，已检查", "आंतरिक मोड: न config/routes.go न सर्वर main, जाँचा गया", "الوضع الداخلي: لا يوجد config/routes.go ولا main للخادم، تم الفحص", "Modo interno: sem config/routes.go e sem main do servidor, verificado", "Mode interne : ni config/routes.go ni main serveur, vérifié", "Interner Modus: weder config/routes.go noch Server-main, geprüft", "Внутренний режим: нет config/routes.go и main сервера, проверено"]
+  }
+}
