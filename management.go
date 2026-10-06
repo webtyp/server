@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"webtyp.com/fmt/lang"
+	"webtyp.com/lang"
 )
 
 // Startup-decision log lines. Kept as constants so the decision a project took
