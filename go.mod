@@ -8,7 +8,7 @@ require (
 	webtyp.com/fmt v1.0.0
 	webtyp.com/gobuild v0.0.28
 	webtyp.com/gorun v0.0.27
-	webtyp.com/json v0.5.27
+	webtyp.com/json v0.5.29
 	webtyp.com/model v0.2.2
 	webtyp.com/pwa v0.1.1
 	webtyp.com/router v0.3.2
@@ -18,4 +18,5 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	howett.net/plist v1.0.0 // indirect
+	webtyp.com/escape v0.1.0 // indirect
 )
