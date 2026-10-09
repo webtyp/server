@@ -11,7 +11,7 @@ require (
 	webtyp.com/lang v0.1.3
 	webtyp.com/model v0.2.2
 	webtyp.com/pwa v0.1.1
-	webtyp.com/router v0.4.0
+	webtyp.com/router v0.4.1
 )
 
 require (
