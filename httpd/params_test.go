@@ -69,3 +69,34 @@ func TestRegistrationRejectsWildcard(t *testing.T) {
 
 	s.Router().Get("/x/{a...}", func(ctx router.Context) {})
 }
+
+// router.QueryParam(ctx.Path(), key) is how handlers read the query string (router's contract:
+// Path may carry it), so Path must keep it.
+func TestPathKeepsQueryString(t *testing.T) {
+	s := New(Config{})
+	var gotPath, gotCursor string
+	s.Router().Get("/api/pull", func(ctx router.Context) {
+		gotPath = ctx.Path()
+		gotCursor, _ = router.QueryParam(ctx.Path(), "cursor")
+		ctx.WriteStatus(http.StatusOK)
+	}).Public()
+
+	handler, err := s.Handler()
+	if err != nil {
+		t.Fatalf("Handler() error: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/pull?cursor=42&limit=5", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if gotPath != "/api/pull?cursor=42&limit=5" {
+		t.Errorf("Path() = %q, want the path with its query string", gotPath)
+	}
+	if gotCursor != "42" {
+		t.Errorf("QueryParam(cursor) = %q, want %q", gotCursor, "42")
+	}
+}

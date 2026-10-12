@@ -32,8 +32,12 @@ func (c *httpContext) Method() string {
 	return c.r.Method
 }
 
+// Path returns the request path with its query string, if any: router.QueryParam reads it from here.
 func (c *httpContext) Path() string {
-	return c.r.URL.Path
+	if c.r.URL.RawQuery == "" {
+		return c.r.URL.Path
+	}
+	return c.r.URL.Path + "?" + c.r.URL.RawQuery
 }
 
 // Param returns a path parameter the matched route declared with {name}.
