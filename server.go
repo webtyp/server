@@ -63,7 +63,7 @@ type ServerHandler struct {
 	*Config
 	mainFileExternalServer string // eg: main.server.go
 	strategy               ServerStrategy
-	strategyMu             sync.RWMutex // protects strategy field
+	strategyMu             sync.RWMutex // protects strategy and executionInternal only — never call onLog or a strategy method while holding it
 	portMu                 sync.RWMutex // protects AppPort (read from goroutines started by strategies)
 	executionInternal      bool         // true = embedded server (internal), false = external process
 	onLog                  func(message ...any)
@@ -73,18 +73,18 @@ type ServerHandler struct {
 }
 
 type Config struct {
-	AppRootDir                  string               // e.g., /home/user/project (application root directory)
-	SourceDir                   string               // directory location of main.go e.g., src/cmd/appserver (relative to AppRootDir)
-	OutputDir                   string               // compilation and execution directory e.g., deploy/appserver (relative to AppRootDir)
-	PublicDir                   string               // default public dir for generated server (e.g., src/web/public)
-	MainInputFile               string               // main input file name (default: "main.go", can be "server.go", etc.)
-	ArgumentsForCompilingServer func() []string      // e.g., []string{"-X 'main.version=v1.0.0'"}
-	ArgumentsToRunServer        func() []string      // e.g., []string{"dev"}
-	AppPort                     string               // e.g., 8080
-	Https                       bool                 // true if HTTPS is enabled
-	DisableGlobalCleanup        bool                 // If true, disables global cleanup in gorun during restarts
-	Logger                      func(message ...any) // Logger function
-	ExitChan                    chan bool            // Global channel to signal shutdown
+	AppRootDir                  string                   // e.g., /home/user/project (application root directory)
+	SourceDir                   string                   // directory location of main.go e.g., src/cmd/appserver (relative to AppRootDir)
+	OutputDir                   string                   // compilation and execution directory e.g., deploy/appserver (relative to AppRootDir)
+	PublicDir                   string                   // default public dir for generated server (e.g., src/web/public)
+	MainInputFile               string                   // main input file name (default: "main.go", can be "server.go", etc.)
+	ArgumentsForCompilingServer func() []string          // e.g., []string{"-X 'main.version=v1.0.0'"}
+	ArgumentsToRunServer        func() []string          // e.g., []string{"dev"}
+	AppPort                     string                   // e.g., 8080
+	Https                       bool                     // true if HTTPS is enabled
+	DisableGlobalCleanup        bool                     // If true, disables global cleanup in gorun during restarts
+	Logger                      func(message ...any)     // Logger function
+	ExitChan                    chan bool                // Global channel to signal shutdown
 	Store                       Store                    // Persistent storage for modes
 	UI                          UI                       // UI for refresh notifications
 	BeforeExternalServerStart   func() error             // Called synchronously before external strategy starts
@@ -267,10 +267,12 @@ func (h *ServerHandler) SupportedExtensions() []string {
 // UnobservedFiles returns the list of files that should not be tracked by file watchers
 func (h *ServerHandler) UnobservedFiles() []string {
 	h.strategyMu.RLock()
-	defer h.strategyMu.RUnlock()
+	isInternal := h.executionInternal
+	strategy := h.strategy
+	h.strategyMu.RUnlock()
 
-	if !h.executionInternal {
-		if ext, ok := h.strategy.(*externalStrategy); ok {
+	if !isInternal {
+		if ext, ok := strategy.(*externalStrategy); ok {
 			return ext.goCompiler.UnobservedFiles()
 		}
 	}
@@ -283,33 +285,47 @@ func (h *ServerHandler) UnobservedFiles() []string {
 // 2. Compiles the server
 // 3. Starts the external process
 func (h *ServerHandler) SetExternalServerMode(external bool) error {
-	h.strategyMu.Lock()
-	defer h.strategyMu.Unlock()
+	// strategyMu guards the fields only: onLog, Stop, Start and
+	// newExternalStrategy (which logs) run outside it.
+	h.strategyMu.RLock()
+	isInternal := h.executionInternal
+	current := h.strategy
+	h.strategyMu.RUnlock()
 
-	if external {
-		if h.executionInternal {
-			h.log("Switching to External Server Mode...")
-
-			if err := h.ensureServerMain(true); err != nil {
-				return err
-			}
-
-			// Stop current internal strategy
-			if err := h.strategy.Stop(); err != nil {
-				h.log("Warning stopping internal server:", err)
-			}
-
-			waitForPortFree(h.Port())
-
-			h.executionInternal = false
-			h.strategy = newExternalStrategy(h)
-
-			go h.strategy.Start(nil)
-		}
-	} else {
-		if !h.executionInternal {
+	if !external {
+		if !isInternal {
 			return errors.New("cannot switch back to Internal execution mode once External mode is active")
 		}
+		return nil
 	}
+	if !isInternal {
+		return nil
+	}
+
+	h.log("Switching to External Server Mode...")
+
+	if err := h.ensureServerMain(true); err != nil {
+		return err
+	}
+
+	// Stop current internal strategy
+	if err := current.Stop(); err != nil {
+		h.log("Warning stopping internal server:", err)
+	}
+
+	waitForPortFree(h.Port())
+
+	s := newExternalStrategy(h)
+	h.strategyMu.Lock()
+	if !h.executionInternal {
+		// A concurrent transition won; its strategy is the one running.
+		h.strategyMu.Unlock()
+		return nil
+	}
+	h.executionInternal = false
+	h.strategy = s
+	h.strategyMu.Unlock()
+
+	go s.Start(nil)
 	return nil
 }

@@ -8,17 +8,22 @@ import (
 // It generates the server files (if not present), compiles, and runs them.
 // This implements the transition from "Internal" to "External" mode.
 func (h *ServerHandler) CreateTemplateServer() error {
-	h.strategyMu.Lock()
+	// strategyMu guards the fields only: onLog, Stop and newExternalStrategy
+	// (which logs) all run outside it, or a logger that re-enters the handler
+	// deadlocks.
+	h.strategyMu.RLock()
+	isInternal := h.executionInternal
+	current := h.strategy
+	h.strategyMu.RUnlock()
 
-	if !h.executionInternal {
-		h.strategyMu.Unlock()
+	if !isInternal {
 		h.log("Server is already in external mode.")
 		return nil
 	}
 
 	h.log("Stopping Internal Server...")
 	// Stop the current internal server
-	if err := h.strategy.Stop(); err != nil {
+	if err := current.Stop(); err != nil {
 		return errors.Join(errors.New("failed to stop internal server"), err)
 	}
 
@@ -28,12 +33,15 @@ func (h *ServerHandler) CreateTemplateServer() error {
 	}
 
 	h.log("Switching to External Process Strategy...")
-	// Switch strategy state
+	s := newExternalStrategy(h)
+	h.strategyMu.Lock()
+	if !h.executionInternal {
+		// A concurrent transition won; its strategy is the one running.
+		h.strategyMu.Unlock()
+		return nil
+	}
 	h.executionInternal = false
-	h.strategy = newExternalStrategy(h)
-
-	// Capture strategy to call Start on it without needing the lock
-	s := h.strategy
+	h.strategy = s
 	h.strategyMu.Unlock()
 
 	h.log("Starting External Server...")

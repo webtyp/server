@@ -30,6 +30,9 @@ func (h *ServerHandler) StartServer(wg *sync.WaitGroup) {
 		}
 	}
 
+	// The decision is logged after Unlock: onLog may re-enter the handler
+	// (the TUI reads Value() under the mutex its log relay takes).
+	var decision, decisionPath string
 	h.strategyMu.Lock()
 	if h.needsExternalProcess() {
 		if h.executionInternal {
@@ -37,16 +40,18 @@ func (h *ServerHandler) StartServer(wg *sync.WaitGroup) {
 			h.strategy = newExternalStrategy(h)
 		}
 		if h.hasHandWrittenMain() {
-			h.log(lang.Translate(LogExternalUserMain).String(), filepath.Join(h.AppRootDir, h.serverMainRelPath()))
+			decision, decisionPath = LogExternalUserMain, filepath.Join(h.AppRootDir, h.serverMainRelPath())
 		} else {
-			h.log(lang.Translate(LogExternalGenerated).String(), h.routesManifestPath())
+			decision, decisionPath = LogExternalGenerated, h.routesManifestPath()
 		}
 	} else {
-		h.log(lang.Translate(LogInternalNoRoutes).String(), h.routesManifestPath())
+		decision, decisionPath = LogInternalNoRoutes, h.routesManifestPath()
 	}
 	isInternal := h.executionInternal
 	strategy := h.strategy
 	h.strategyMu.Unlock()
+
+	h.log(lang.Translate(decision).String(), decisionPath)
 
 	if !isInternal {
 		if err := h.BeforeExternalServerStart(); err != nil {
@@ -66,7 +71,10 @@ func (h *ServerHandler) StartServer(wg *sync.WaitGroup) {
 // StopServer stops the server and waits for the port to be released.
 func (h *ServerHandler) StopServer() error {
 	h.log("Stopping server...")
-	err := h.strategy.Stop()
+	h.strategyMu.RLock()
+	strategy := h.strategy
+	h.strategyMu.RUnlock()
+	err := strategy.Stop()
 	if err != nil {
 		h.log("StopServer error:", err)
 	}
@@ -94,18 +102,22 @@ func (h *ServerHandler) StopServer() error {
 }
 
 func (h *ServerHandler) RestartServer() error {
-	return h.strategy.Restart()
+	h.strategyMu.RLock()
+	strategy := h.strategy
+	h.strategyMu.RUnlock()
+	return strategy.Restart()
 }
 
 // Restart restarts the server.
 // It delegates to the current strategy's Restart method.
 func (h *ServerHandler) Restart() error {
 	h.strategyMu.RLock()
-	defer h.strategyMu.RUnlock()
+	strategy := h.strategy
+	h.strategyMu.RUnlock()
 
-	if h.strategy != nil {
-		h.log("Restarting server strategy:", h.strategy.Name())
-		return h.strategy.Restart()
+	if strategy != nil {
+		h.log("Restarting server strategy:", strategy.Name())
+		return strategy.Restart()
 	}
 	return nil
 }
