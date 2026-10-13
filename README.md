@@ -95,7 +95,8 @@ serving, TLS (AutoCert/custom cert/PlainHTTP, default: local CA), a `/health` en
 JSON listing, and closed-by-default RBAC enforcement (`Config.Authn` for global identity,
 `Config.Authorize` for per-route `Requires(resource, action)` checks, and `Config.Policy`
 to report which roles hold each route's required permission; `Authorize` answers "may this user do this?",
-while `Policy` answers "who may do this?"; routes must opt into `Public()` to allow anonymous access).
+while `Policy` answers "who may do this?"; routes must opt into `Public()` to allow anonymous access;
+routes demanding a second factor via `RequiresMFA()` issue a 401 challenge on single-factor access).
 
 ```go
 s := httpd.New(httpd.Config{

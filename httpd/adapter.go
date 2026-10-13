@@ -19,13 +19,19 @@ var (
 	_ router.Route    = (*httpRoute)(nil)
 )
 
+const (
+	bodyForbidden    = "Forbidden\n"
+	bodyUnauthorized = "Unauthorized\n"
+)
+
 type httpContext struct {
-	w      http.ResponseWriter
-	r      *http.Request
-	body   []byte
-	once   sync.Once
-	values map[string]string
-	userID string
+	w         http.ResponseWriter
+	r         *http.Request
+	body      []byte
+	once      sync.Once
+	values    map[string]string
+	userID    string
+	assurance model.Assurance
 }
 
 func (c *httpContext) Method() string {
@@ -122,6 +128,17 @@ func (c *httpContext) SetUserID(id string) {
 
 func (c *httpContext) UserID() string {
 	return c.userID
+}
+
+func (c *httpContext) SetAssurance(a model.Assurance) {
+	c.assurance = a
+}
+
+func (c *httpContext) Assurance() model.Assurance {
+	if c.userID == "" {
+		return model.AssuranceNone
+	}
+	return c.assurance
 }
 
 func (c *httpContext) SetCookie(cookie router.Cookie) {
@@ -224,6 +241,11 @@ func (r *httpRoute) Authenticated() router.Route {
 
 func (r *httpRoute) Public() router.Route {
 	r.info.Access = model.AccessPublic
+	return r
+}
+
+func (r *httpRoute) RequiresMFA() router.Route {
+	r.info.MFA = true
 	return r
 }
 
@@ -445,7 +467,13 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 		case model.AccessAuthenticated:
 			if ctx.UserID() == "" {
 				ctx.WriteStatus(http.StatusForbidden)
-				ctx.Write([]byte("Forbidden\n"))
+				ctx.Write([]byte(bodyForbidden))
+				return
+			}
+			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
+				ctx.WriteStatus(http.StatusUnauthorized)
+				ctx.Write([]byte(bodyUnauthorized))
 				return
 			}
 			next(ctx)
@@ -453,13 +481,19 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 		default: // model.AccessGuarded — el zero value: identidad Y permiso
 			if ctx.UserID() == "" {
 				ctx.WriteStatus(http.StatusForbidden)
-				ctx.Write([]byte("Forbidden\n"))
+				ctx.Write([]byte(bodyForbidden))
+				return
+			}
+			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
+				ctx.WriteStatus(http.StatusUnauthorized)
+				ctx.Write([]byte(bodyUnauthorized))
 				return
 			}
 			// model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
 			if !model.Allowed(authorizer, ctx.UserID(), route.info.Resource, route.info.Action) {
 				ctx.WriteStatus(http.StatusForbidden)
-				ctx.Write([]byte("Forbidden\n"))
+				ctx.Write([]byte(bodyForbidden))
 				return
 			}
 			next(ctx)

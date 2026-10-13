@@ -4,10 +4,15 @@ import (
 	"fmt"
 
 	"webtyp.com/model"
+	"webtyp.com/router"
 )
 
 func (s *Server) validateRBAC() error {
 	for _, r := range s.router.routes {
+		if r.info.MFA && r.info.Access == model.AccessPublic {
+			return fmt.Errorf("route %s %s %s", r.info.Method, r.info.Path, router.ErrMsgPublicRequiresMFA)
+		}
+
 		// AccessGuarded without Resource
 		if r.info.Access == model.AccessGuarded && r.info.Resource == "" {
 			return fmt.Errorf("route %s %s is guarded but has no resource defined", r.info.Method, r.info.Path)

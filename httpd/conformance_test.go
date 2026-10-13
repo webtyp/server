@@ -2,12 +2,14 @@ package httpd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
+	"webtyp.com/model"
 	"webtyp.com/router"
 	"webtyp.com/router/conformance"
 )
@@ -16,6 +18,7 @@ import (
 // Authn middleware turns into an identity. A production deployment reads a session cookie or
 // a bearer token instead — the seam is the same one, which is the point.
 const conformanceUserHeader = "X-Conformance-User"
+const conformanceAssuranceHeader = "X-Conformance-Assurance"
 
 // TestHTTPDConformance holds this adapter to the router contract — the executable one, shared
 // with every other implementation (see router/conformance).
@@ -40,6 +43,11 @@ func TestHTTPDConformance(t *testing.T) {
 						if id := ctx.GetHeader(conformanceUserHeader); id != "" {
 							ctx.SetUserID(id)
 						}
+						if ass := ctx.GetHeader(conformanceAssuranceHeader); ass != "" {
+							var a uint8
+							fmt.Sscanf(ass, "%d", &a)
+							ctx.SetAssurance(model.Assurance(a))
+						}
 						next(ctx)
 					}
 				},
@@ -57,23 +65,29 @@ func TestHTTPDConformance(t *testing.T) {
 			var handler http.Handler
 			var buildErr error
 
-			serve := func(method, path string, body []byte, userID string) conformance.Response {
+			serve := func(method, path string, body []byte, who conformance.Identity) conformance.Response {
 				once.Do(func() { handler, buildErr = srv.Handler() })
 				if buildErr != nil {
 					t.Fatalf("building the handler failed: %v", buildErr)
 				}
 
 				req := httptest.NewRequest(method, path, bytes.NewReader(body))
-				if userID != "" {
-					req.Header.Set(conformanceUserHeader, userID)
+				if who.UserID != "" {
+					req.Header.Set(conformanceUserHeader, who.UserID)
 				}
+				req.Header.Set(conformanceAssuranceHeader, fmt.Sprint(uint8(who.Assurance)))
+
 				rec := httptest.NewRecorder()
 				handler.ServeHTTP(rec, req)
 
 				res := rec.Result()
 				defer res.Body.Close()
 				out, _ := io.ReadAll(res.Body)
-				return conformance.Response{Status: res.StatusCode, Body: out}
+				return conformance.Response{
+					Status:    res.StatusCode,
+					Body:      out,
+					Challenge: res.Header.Get(router.HeaderWWWAuthenticate),
+				}
 			}
 			return r, serve
 		},
