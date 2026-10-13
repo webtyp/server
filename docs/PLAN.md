@@ -2,8 +2,10 @@
 PLAN: "feat(httpd): enforce RequiresMFA and carry request assurance"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 8604110242520868238
+PR: https://github.com/webtyp/server/pull/23
+REVIEWED_COMMIT: e3bd822a120f6983dbe1ef967a38a77ba4875cf2
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
