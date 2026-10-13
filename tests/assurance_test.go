@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"webtyp.com/server/httpd"
 	"webtyp.com/model"
 	"webtyp.com/router"
+	"webtyp.com/server/httpd"
 )
 
 func TestStreamRequiresMFA(t *testing.T) {
