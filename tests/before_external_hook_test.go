@@ -226,6 +226,7 @@ func TestCreateTemplateServer_InvokesBeforeHook(t *testing.T) {
 // CreateTemplateServer must propagate hook errors and NOT start the strategy.
 func TestCreateTemplateServer_HookErrorAbortsStart(t *testing.T) {
 	h := server.New()
+	h.SetAppRootDir(t.TempDir())
 
 	hookErr := errors.New("boom")
 	h.SetBeforeExternalServerStart(func() error {
