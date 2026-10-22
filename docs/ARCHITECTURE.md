@@ -17,12 +17,12 @@ The generated main imports the project's `routes` package and calls
 `routes.Register` on the server it builds, so development and production serve
 **the same route set from the same source**. The previous
 `templates/server_basic.md` scaffold is gone: it produced a committed
-`web/server.go` whose routes had to be kept in sync by hand with the ones the
+`web/server/main.go` whose routes had to be kept in sync by hand with the ones the
 dev process registered, and they drifted.
 
 Which strategy runs is decided by one file: a project with `routes/routes.go`
 gets the compiled server; a project without one gets the in-memory asset server
-and compiles nothing. A `web/server.go` that a developer writes themselves still
+and compiles nothing. A `web/server/main.go` that a developer writes themselves still
 wins — the tool never overrides code the user owns — but nothing generates it.
 
 ## Components

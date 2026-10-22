@@ -170,9 +170,9 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 
 	h := server.New()
 	h.SetAppRootDir(tmpData)
-	h.SetSourceDir("web")
-	h.SetOutputDir("web")
-	h.SetMainInputFile("server.go")
+	h.SetSourceDir("web/server")
+	h.SetOutputDir("web/server")
+	h.SetMainInputFile("main.go")
 	h.SetExitChan(exitChan)
 	h.SetGitIgnoreAdd(gitIgnoreAdd)
 
@@ -192,7 +192,7 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 		}
 		return false
 	}
-	if wantBinary := filepath.Join("web", "server"); !has(wantBinary) {
+	if wantBinary := filepath.Join("web", "server", "server"); !has(wantBinary) {
 		t.Errorf("GitIgnoreAdd never received binary path %q; got %v", wantBinary, entries)
 	}
 }
@@ -286,11 +286,11 @@ func TestStartServer_DetectsExistingServerFile(t *testing.T) {
 	tmpData := t.TempDir()
 
 	// Create a dummy server file
-	svrDir := filepath.Join(tmpData, "web")
+	svrDir := filepath.Join(tmpData, "web", "server")
 	if err := os.MkdirAll(svrDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	svrFile := filepath.Join(svrDir, "server.go")
+	svrFile := filepath.Join(svrDir, "main.go")
 	if err := os.WriteFile(svrFile, []byte("package main"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -301,8 +301,8 @@ func TestStartServer_DetectsExistingServerFile(t *testing.T) {
 
 	h := server.New()
 	h.SetAppRootDir(tmpData)
-	h.SetSourceDir("web")
-	h.SetMainInputFile("server.go")
+	h.SetSourceDir("web/server")
+	h.SetMainInputFile("main.go")
 	h.SetExitChan(exitChan)
 
 	// Expectation: Initially internal

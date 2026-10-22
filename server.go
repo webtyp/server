@@ -74,8 +74,8 @@ type ServerHandler struct {
 
 type Config struct {
 	AppRootDir                  string                   // e.g., /home/user/project (application root directory)
-	SourceDir                   string                   // directory location of main.go e.g., src/cmd/appserver (relative to AppRootDir)
-	OutputDir                   string                   // compilation and execution directory e.g., deploy/appserver (relative to AppRootDir)
+	SourceDir                   string                   // directory location of main.go e.g., web/server (relative to AppRootDir)
+	OutputDir                   string                   // compilation and execution directory e.g., web/server (relative to AppRootDir)
 	PublicDir                   string                   // default public dir for generated server (e.g., src/web/public)
 	MainInputFile               string                   // main input file name (default: "main.go", can be "server.go", etc.)
 	ArgumentsForCompilingServer func() []string          // e.g., []string{"-X 'main.version=v1.0.0'"}
@@ -95,8 +95,8 @@ type Config struct {
 func New() *ServerHandler {
 	c := &Config{
 		AppRootDir:                  ".",
-		SourceDir:                   "web",
-		OutputDir:                   "web",
+		SourceDir:                   "web/server",
+		OutputDir:                   "web/server",
 		PublicDir:                   "web/public",
 		MainInputFile:               "main.go",
 		AppPort:                     "8080",
