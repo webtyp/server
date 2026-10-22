@@ -28,11 +28,11 @@ func mkRoutes(t *testing.T, root string) {
 
 func mkUserMain(t *testing.T, root string) {
 	t.Helper()
-	dir := filepath.Join(root, "web")
+	dir := filepath.Join(root, "web", "server")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "server.go"), []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -40,14 +40,14 @@ func mkUserMain(t *testing.T, root string) {
 func newDecisionHandler(root string) *ServerHandler {
 	h := New()
 	h.SetAppRootDir(root)
-	h.SetSourceDir("web")
-	h.SetMainInputFile("server.go")
+	h.SetSourceDir("web/server")
+	h.SetMainInputFile("main.go")
 	h.SetHTTPS(false)
 	return h
 }
 
 // Test 2/4 — strategy selection is decided by config/routes.go, with an existing
-// handwritten web/server.go as the escape hatch that wins and is never generated over.
+// handwritten web/server/main.go as the escape hatch that wins and is never generated over.
 func TestServerMainSelection(t *testing.T) {
 	t.Run("no routes, no user main -> internal, nothing generated", func(t *testing.T) {
 		root := t.TempDir()
@@ -92,7 +92,7 @@ func TestServerMainSelection(t *testing.T) {
 		}
 	})
 
-	t.Run("handwritten web/server.go is the escape hatch and wins", func(t *testing.T) {
+	t.Run("handwritten web/server/main.go is the escape hatch and wins", func(t *testing.T) {
 		root := t.TempDir()
 		mkModule(t, root)
 		mkRoutes(t, root) // even with routes present...
@@ -100,12 +100,12 @@ func TestServerMainSelection(t *testing.T) {
 		h := newDecisionHandler(root)
 
 		if !h.hasHandWrittenMain() {
-			t.Fatal("hasHandWrittenMain = false with handwritten web/server.go present")
+			t.Fatal("hasHandWrittenMain = false with handwritten web/server/main.go present")
 		}
 		if h.usesGeneratedMain() {
-			t.Error("usesGeneratedMain = true although handwritten web/server.go exists")
+			t.Error("usesGeneratedMain = true although handwritten web/server/main.go exists")
 		}
-		if got, want := h.serverMainRelPath(), filepath.Join("web", "server.go"); got != want {
+		if got, want := h.serverMainRelPath(), filepath.Join("web", "server", "main.go"); got != want {
 			t.Errorf("serverMainRelPath = %q, want %q", got, want)
 		}
 
@@ -115,9 +115,9 @@ func TestServerMainSelection(t *testing.T) {
 				t.Fatalf("ensureServerMain(%v): %v", force, err)
 			}
 		}
-		got, _ := os.ReadFile(filepath.Join(root, "web", "server.go"))
+		got, _ := os.ReadFile(filepath.Join(root, "web", "server", "main.go"))
 		if string(got) != before {
-			t.Errorf("web/server.go was modified:\n%s", got)
+			t.Errorf("web/server/main.go was modified:\n%s", got)
 		}
 	})
 }

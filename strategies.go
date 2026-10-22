@@ -332,13 +332,16 @@ func newExternalStrategy(h *ServerHandler) *externalStrategy {
 	}
 
 	// The file to compile: the user's own main when present, otherwise the
-	// generated artifact at .build/server/main.go.
+	// generated artifact at web/server/main.go.
 	mainRel := h.serverMainRelPath()
 
-	// Extract output name from the compiled file (e.g. "main.go" -> "main")
-	outName := filepath.Base(mainRel)
-	if ext := filepath.Ext(outName); ext != "" {
-		outName = outName[:len(outName)-len(ext)]
+	// The binary is named by its folder: web/server/main.go -> web/server/server.
+	outName := filepath.Base(filepath.Dir(mainRel))
+	if outName == "." || outName == "" {
+		outName = filepath.Base(mainRel)
+		if ext := filepath.Ext(outName); ext != "" {
+			outName = outName[:len(outName)-len(ext)]
+		}
 	}
 
 	// Ensure the output directory exists

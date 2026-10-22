@@ -15,11 +15,12 @@ import (
 )
 
 // GeneratedMainDir is the directory, relative to the project root, holding the
-// generated server entry point. It must be inside the project: outside the
-// module tree the Go toolchain cannot resolve the project's own imports.
+// generated server entry point: web/server/ (one main per folder; the folder is the
+// binary). It must be inside the project: outside the module tree the Go
+// toolchain cannot resolve the project's own imports.
 const (
-	GeneratedMainDir      = "web"
-	GeneratedMainFilename = "server.go"
+	GeneratedMainDir      = "web/server"
+	GeneratedMainFilename = "main.go"
 
 	// goModFilename is the module manifest read for the module path.
 	goModFilename = "go.mod"
@@ -155,7 +156,7 @@ func readModulePath(rootDir string) string {
 //
 // modulePath is the project's module path, read from go.mod.
 func GenerateMain(rootDir, modulePath string, cfg MainConfig) (string, error) {
-	outDir := filepath.Join(rootDir, GeneratedMainDir)
+	outDir := filepath.Join(rootDir, filepath.FromSlash(GeneratedMainDir))
 	if err := os.MkdirAll(outDir, dirPerm); err != nil {
 		return "", fmt.Errorf("creating build directory: %w", err)
 	}

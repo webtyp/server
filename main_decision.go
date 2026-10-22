@@ -11,13 +11,13 @@ import (
 // Startup decision, decided by one file with no configuration:
 //
 //	config/routes.go present  -> generate, compile and run the server main
-//	web/server.go present     -> compile and run the user's own main (escape hatch if not generated)
+//	web/server/main.go present     -> compile and run the user's own main (escape hatch if not generated)
 //	neither                   -> internal in-memory asset server, nothing compiled
 //
 // The escape hatch always wins: the tool never overwrites a main the user wrote.
 
 // hasHandWrittenMain reports whether the user supplied their own server entry
-// point at <AppRootDir>/<SourceDir>/<MainInputFile> (canonically web/server.go)
+// point at <AppRootDir>/<SourceDir>/<MainInputFile> (canonically web/server/main.go)
 // that does not contain the generated header.
 func (h *ServerHandler) hasHandWrittenMain() bool {
 	content, err := os.ReadFile(filepath.Join(h.AppRootDir, h.SourceDir, h.mainFileExternalServer))

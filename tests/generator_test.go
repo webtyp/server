@@ -63,8 +63,8 @@ func writeRoutesFile(t *testing.T, root string) {
 
 func TestGenerateCreatesFile(t *testing.T) {
 	tmp := t.TempDir()
-	sourceDir := "web"
-	outputDir := "web"
+	sourceDir := "web/server"
+	outputDir := "web/server"
 	h := newTestHandler(t, sourceDir, outputDir, tmp)
 	writeRoutesFile(t, tmp)
 
@@ -100,14 +100,14 @@ func TestGenerateCreatesFile(t *testing.T) {
 
 func TestGenerateDoesNotOverwriteExistingServerFile(t *testing.T) {
 	tmp := t.TempDir()
-	sourceDir := "web"
-	outputDir := "web"
+	sourceDir := "web/server"
+	outputDir := "web/server"
 	fullSourcePath := filepath.Join(tmp, sourceDir)
 	if err := os.MkdirAll(fullSourcePath, 0755); err != nil {
 		t.Fatalf("creating source dir: %v", err)
 	}
 	h := newTestHandler(t, sourceDir, outputDir, tmp)
-	target := filepath.Join(fullSourcePath, "server.go")
+	target := filepath.Join(fullSourcePath, "main.go")
 
 	orig := "__ORIGINAL__"
 	if err := os.WriteFile(target, []byte(orig), 0644); err != nil {

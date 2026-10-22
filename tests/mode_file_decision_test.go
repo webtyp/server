@@ -22,12 +22,12 @@ func (s *recordingStore) Set(key, _ string) error    { s.writes = append(s.write
 // presente, StartServer debe elegir la estrategia externa.
 func TestModoExternoLoDecideElArchivo(t *testing.T) {
 	tmpData := t.TempDir()
-	svrDir := filepath.Join(tmpData, "web")
+	svrDir := filepath.Join(tmpData, "web", "server")
 	if err := os.MkdirAll(svrDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	serverFilePath := filepath.Join(svrDir, "server.go")
+	serverFilePath := filepath.Join(svrDir, "main.go")
 	if err := os.WriteFile(serverFilePath, []byte("package main"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +37,8 @@ func TestModoExternoLoDecideElArchivo(t *testing.T) {
 
 	h := server.New()
 	h.SetAppRootDir(tmpData)
-	h.SetSourceDir("web")
-	h.SetMainInputFile("server.go")
+	h.SetSourceDir("web/server")
+	h.SetMainInputFile("main.go")
 	h.SetExitChan(exitChan)
 
 	var wg sync.WaitGroup
@@ -60,8 +60,8 @@ func TestModoInternoSinArchivo(t *testing.T) {
 
 	h := server.New()
 	h.SetAppRootDir(tmpData)
-	h.SetSourceDir("web")
-	h.SetMainInputFile("server.go")
+	h.SetSourceDir("web/server")
+	h.SetMainInputFile("main.go")
 	h.SetPort("19092")
 	h.SetExitChan(exitChan)
 
@@ -88,12 +88,12 @@ func TestNoSeEscribeNingunaClaveDeModo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpData := t.TempDir()
-			svrDir := filepath.Join(tmpData, "web")
+			svrDir := filepath.Join(tmpData, "web", "server")
 			if err := os.MkdirAll(svrDir, 0755); err != nil {
 				t.Fatal(err)
 			}
 
-			serverFilePath := filepath.Join(svrDir, "server.go")
+			serverFilePath := filepath.Join(svrDir, "main.go")
 			if tt.withFile {
 				if err := os.WriteFile(serverFilePath, []byte("package main"), 0644); err != nil {
 					t.Fatal(err)
@@ -106,8 +106,8 @@ func TestNoSeEscribeNingunaClaveDeModo(t *testing.T) {
 			store := &recordingStore{}
 			h := server.New()
 			h.SetAppRootDir(tmpData)
-			h.SetSourceDir("web")
-			h.SetMainInputFile("server.go")
+			h.SetSourceDir("web/server")
+			h.SetMainInputFile("main.go")
 			h.SetPort("19093")
 			h.SetExitChan(exitChan)
 			h.SetStore(store)
@@ -134,7 +134,7 @@ func TestLaDecisionSeRegistraConLaRutaCompleta(t *testing.T) {
 	}{
 		{
 			"user server main", true, server.LogExternalUserMain,
-			func(root string) string { return filepath.Join(root, "web", "server.go") },
+			func(root string) string { return filepath.Join(root, "web", "server", "main.go") },
 		},
 		{
 			"no routes, no main", false, server.LogInternalNoRoutes,
@@ -145,13 +145,13 @@ func TestLaDecisionSeRegistraConLaRutaCompleta(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpData := t.TempDir()
-			svrDir := filepath.Join(tmpData, "web")
+			svrDir := filepath.Join(tmpData, "web", "server")
 			if err := os.MkdirAll(svrDir, 0755); err != nil {
 				t.Fatal(err)
 			}
 
 			if tt.withFile {
-				if err := os.WriteFile(filepath.Join(svrDir, "server.go"), []byte("package main"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(svrDir, "main.go"), []byte("package main"), 0644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -171,8 +171,8 @@ func TestLaDecisionSeRegistraConLaRutaCompleta(t *testing.T) {
 
 			h := server.New()
 			h.SetAppRootDir(tmpData)
-			h.SetSourceDir("web")
-			h.SetMainInputFile("server.go")
+			h.SetSourceDir("web/server")
+			h.SetMainInputFile("main.go")
 			h.SetHTTPS(false)
 			h.SetPort("19094")
 			h.SetExitChan(exitChan)

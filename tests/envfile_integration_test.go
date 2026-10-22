@@ -53,13 +53,13 @@ func TestExternalStrategy_RootEnvFileVisibleToHandWrittenMain(t *testing.T) {
 		t.Fatalf("writing go.mod: %v", err)
 	}
 
-	webDir := filepath.Join(tmp, "web")
+	webDir := filepath.Join(tmp, "web", "server")
 	if err := os.MkdirAll(webDir, 0755); err != nil {
-		t.Fatalf("creating web dir: %v", err)
+		t.Fatalf("creating web/server dir: %v", err)
 	}
 
 	// A hand-written main (the escape hatch) that reads ENV_PROBE_KEY the
-	// same way an app's own web/server.go would — via os.Getenv, no
+	// same way an app's own web/server/main.go would — via os.Getenv, no
 	// webtyp.com/env dependency needed to prove the environment reaches the
 	// child process at all — and serves /health so the test can poll like
 	// the other external-mode integration test in this package.
