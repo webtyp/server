@@ -2,6 +2,8 @@
 PLAN: "feat!: the server main is web/server/main.go and compiles to web/server/server"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 2898538098300110309
 ---
 
 > Read AGENTS.md at the repo root before any change.
