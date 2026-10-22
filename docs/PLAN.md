@@ -2,8 +2,10 @@
 PLAN: "feat!: the server main is web/server/main.go and compiles to web/server/server"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 2898538098300110309
+PR: https://github.com/webtyp/server/pull/24
+REVIEWED_COMMIT: a7a0ddb2df45b41aadd897eeb8556bd281ae83ea
 ---
 
 > Read AGENTS.md at the repo root before any change.
