@@ -9,7 +9,7 @@ require (
 	webtyp.com/gorun v0.0.27
 	webtyp.com/json v0.5.29
 	webtyp.com/lang v0.1.10
-	webtyp.com/model v0.2.6
+	webtyp.com/model v0.2.7
 	webtyp.com/pwa v0.2.13
 	webtyp.com/router v0.4.9
 )
