@@ -15,12 +15,12 @@ const errMultipleTLSModes = "multiple TLS modes enabled; choose at most one (Aut
 // local certificate authority (see LocalCA): a page served by httpd is always a
 // secure context, on localhost and on a LAN. Set at most one of the fields.
 type TLSConfig struct {
-	AutoCert  bool   // public certificate from Let's Encrypt for Domain
+	AutoCert  bool               // public certificate from Let's Encrypt for Domain
 	DNS01     challenge.Provider // a real certificate for Domain by DNS-01; nil = off
 	Domain    string
 	CertFile  string // certificate and key provided by the operator
 	KeyFile   string
-	PlainHTTP bool   // plain HTTP: only when a proxy in front terminates TLS
+	PlainHTTP bool // plain HTTP: only when a proxy in front terminates TLS
 }
 
 type tlsMode uint8
@@ -82,12 +82,8 @@ func (s *Server) validateTLS() error {
 func (s *Server) listenAndServe(srv *http.Server) error {
 	switch s.config.TLS.mode() {
 	case tlsDNS01:
-		d := &dns01Manager{
-			domain:   s.config.TLS.Domain,
-			provider: s.config.TLS.DNS01,
-			logf:     s.log,
-		}
-		if err := d.init(); err != nil {
+		d, err := s.dns01Certificates()
+		if err != nil {
 			return err
 		}
 		srv.TLSConfig = &tls.Config{GetCertificate: d.get}
@@ -108,4 +104,21 @@ func (s *Server) listenAndServe(srv *http.Server) error {
 	// tlsLocal, the zero value: never falls back to plain HTTP.
 	srv.TLSConfig = &tls.Config{GetCertificate: s.localCert.get}
 	return srv.ListenAndServeTLS("", "")
+}
+
+// dns01Certificates builds and starts the DNS-01 manager once per Server: with two
+// doors, listenAndServe runs once per listener, and both must share one
+// certificate, one order and one renewal routine.
+func (s *Server) dns01Certificates() (*dns01Manager, error) {
+	s.dns01Once.Do(func() {
+		if s.dns01 == nil {
+			s.dns01 = &dns01Manager{
+				domain:   s.config.TLS.Domain,
+				provider: s.config.TLS.DNS01,
+				logf:     s.log,
+			}
+		}
+		s.dns01Err = s.dns01.init()
+	})
+	return s.dns01, s.dns01Err
 }

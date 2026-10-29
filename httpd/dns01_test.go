@@ -272,3 +272,40 @@ func TestDNS01_FailedRenewKeepsServing(t *testing.T) {
 		t.Error("expected a cert, got nil")
 	}
 }
+
+// With two doors, listenAndServe runs once per listener: the certificate must be
+// obtained once per Server, not once per door (two concurrent orders writing the
+// same files, two renewal routines).
+func TestDNS01_OneManagerPerServer(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(t.TempDir())
+	defer os.Chdir(origDir)
+
+	obtainCalled := 0
+	s := New(Config{TLS: TLSConfig{DNS01: fakeProvider{}, Domain: "app.example.com"}})
+	s.dns01 = &dns01Manager{
+		domain:   "app.example.com",
+		provider: fakeProvider{},
+		obtain: func(domain string) (*certificate.Resource, error) {
+			obtainCalled++
+			return genTestCert(domain, 60)
+		},
+	}
+	first, err := s.dns01Certificates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.dns01Certificates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Error("each door got its own manager")
+	}
+	if obtainCalled != 1 {
+		t.Errorf("obtain called %d times, want 1", obtainCalled)
+	}
+}
