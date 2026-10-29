@@ -391,8 +391,7 @@ func TestHTTPRouterMethodRestriction(t *testing.T) {
 	// Try to GET a POST-only endpoint
 	req := httptest.NewRequest(http.MethodGet, "/test_method", nil)
 	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
+	markNetwork(mux, router.NetworkLocal).ServeHTTP(w, req)
 	if handlerCalled {
 		t.Fatalf("Handler should not be called for wrong method")
 	}
@@ -459,8 +458,7 @@ func TestHTTPSocketHandler(t *testing.T) {
 	// Socket endpoint should return 501 Not Implemented
 	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
+	markNetwork(mux, router.NetworkLocal).ServeHTTP(w, req)
 	if w.Code != http.StatusNotImplemented {
 		t.Fatalf("Socket should return NotImplemented, got %d", w.Code)
 	}
@@ -717,4 +715,3 @@ func TestStream_GzipBypassedForEventStream(t *testing.T) {
 		t.Errorf("text/event-stream must not be gzipped, got Content-Encoding: %q", got)
 	}
 }
-

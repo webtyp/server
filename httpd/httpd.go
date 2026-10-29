@@ -15,12 +15,13 @@ const (
 )
 
 type Config struct {
-	Port      string
-	PublicDir string // "" = no servir estáticos
-	Gzip      bool
-	NoCache   bool
-	Health    bool
-	Logger    func(...any)
+	Port         string
+	InternetPort string // the internet door (e.g. behind Cloudflare Tunnel); "" = no internet door
+	PublicDir    string // "" = no servir estáticos
+	Gzip         bool
+	NoCache      bool
+	Health       bool
+	Logger       func(...any)
 
 	Authn          router.Middleware
 	Authorize      model.Authorizer
@@ -46,6 +47,8 @@ type Server struct {
 	router                *httpRouter
 	routesEndpointMounted bool
 	localCert             *localCert
+	baseHandler           http.Handler
+	baseErr               error
 }
 
 func applyDefaults(c Config) Config {
@@ -86,6 +89,28 @@ func (s *Server) Mount(m ...router.APIModule) *Server {
 }
 
 func (s *Server) Handler() (http.Handler, error) {
+	b, err := s.base()
+	if err != nil {
+		return nil, err
+	}
+	return markNetwork(b, router.NetworkLocal), nil
+}
+
+// InternetHandler returns the handler for the internet door; the same routes as
+// Handler, marked as coming from the internet.
+func (s *Server) InternetHandler() (http.Handler, error) {
+	b, err := s.base()
+	if err != nil {
+		return nil, err
+	}
+	return markNetwork(b, router.NetworkInternet), nil
+}
+
+func (s *Server) base() (http.Handler, error) {
+	if s.baseHandler != nil || s.baseErr != nil {
+		return s.baseHandler, s.baseErr
+	}
+
 	s.registerRoutesEndpoint()
 
 	s.mux = http.NewServeMux()
@@ -109,6 +134,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	}
 
 	if err := s.validateRBAC(); err != nil {
+		s.baseErr = err
 		return nil, err
 	}
 
@@ -116,6 +142,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	s.router.setAuthorizer(s.config.Authn, s.config.Authorize)
 
 	if err := s.validateTLS(); err != nil {
+		s.baseErr = err
 		return nil, err
 	}
 
@@ -129,18 +156,19 @@ func (s *Server) Handler() (http.Handler, error) {
 	handler = s.wrapWithBatteries(handler)
 	handler = s.wrapWithGlobalBatteries(handler)
 
+	s.baseHandler = handler
 	return handler, nil
 }
 
 func (s *Server) ListenAndServe() error {
-	handler, err := s.Handler()
+	local, err := s.Handler()
 	if err != nil {
 		return err
 	}
 
 	srv := &http.Server{
 		Addr:         ":" + s.config.Port,
-		Handler:      handler,
+		Handler:      local,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -150,7 +178,31 @@ func (s *Server) ListenAndServe() error {
 		s.config.Logger("Starting server on port", s.config.Port)
 	}
 
-	return s.listenAndServe(srv)
+	if s.config.InternetPort == "" {
+		return s.listenAndServe(srv)
+	}
+
+	internet, err := s.InternetHandler()
+	if err != nil {
+		return err
+	}
+
+	internetSrv := &http.Server{
+		Addr:         ":" + s.config.InternetPort,
+		Handler:      internet,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if s.config.Logger != nil {
+		s.config.Logger("Starting internet door on port", s.config.InternetPort)
+	}
+
+	errs := make(chan error, 2)
+	go func() { errs <- s.listenAndServe(srv) }()
+	go func() { errs <- s.listenAndServe(internetSrv) }()
+	return <-errs
 }
 
 func (s *Server) log(args ...any) {

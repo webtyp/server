@@ -33,6 +33,7 @@ func TestSecurityContract_DefaultDeny(t *testing.T) {
 	}
 
 	// 2. Identity without permission -> 403
+	srv.baseHandler = nil // Clear cache for dynamic config update in test
 	srv.config.Authn = func(next router.HandlerFunc) router.HandlerFunc {
 		return func(ctx router.Context) {
 			ctx.SetUserID("guest")
@@ -47,6 +48,7 @@ func TestSecurityContract_DefaultDeny(t *testing.T) {
 	}
 
 	// 3. Identity with permission -> 200
+	srv.baseHandler = nil // Clear cache for dynamic config update in test
 	srv.config.Authn = func(next router.HandlerFunc) router.HandlerFunc {
 		return func(ctx router.Context) {
 			ctx.SetUserID("admin")
@@ -138,8 +140,8 @@ func TestSecurityContract_NilAuthorizeDeniesGuarded(t *testing.T) {
 
 func TestSecurityContract_Contradictions(t *testing.T) {
 	tests := []struct {
-		name string
-		setup func(r router.Router)
+		name   string
+		setup  func(r router.Router)
 		config Config
 	}{
 		{

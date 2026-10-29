@@ -470,7 +470,7 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 				ctx.Write([]byte(bodyForbidden))
 				return
 			}
-			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+			if (route.info.MFA || router.FromInternet(ctx)) && ctx.Assurance() < model.AssuranceMultiFactor {
 				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
 				ctx.WriteStatus(http.StatusUnauthorized)
 				ctx.Write([]byte(bodyUnauthorized))
@@ -484,7 +484,7 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 				ctx.Write([]byte(bodyForbidden))
 				return
 			}
-			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+			if (route.info.MFA || router.FromInternet(ctx)) && ctx.Assurance() < model.AssuranceMultiFactor {
 				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
 				ctx.WriteStatus(http.StatusUnauthorized)
 				ctx.Write([]byte(bodyUnauthorized))
