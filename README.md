@@ -91,7 +91,7 @@ func main() {
 
 `webtyp.com/server/httpd` implements `router.Router`/`router.Context` on top of
 `net/http`, with production batteries built in: gzip, no-cache headers, static file
-serving, TLS (AutoCert/custom cert/PlainHTTP, default: local CA), a `/health` endpoint, an optional `/_routes`
+serving, TLS (AutoCert/DNS01/custom cert/PlainHTTP, default: local CA), a `/health` endpoint, an optional `/_routes`
 JSON listing, and closed-by-default RBAC enforcement (`Config.Authn` for global identity,
 `Config.Authorize` for per-route `Requires(resource, action)` checks, and `Config.Policy`
 to report which roles hold each route's required permission; `Authorize` answers "may this user do this?",
@@ -112,6 +112,24 @@ s.Mount(myAPIModule) // webtyp.com/router.APIModule
 if err := s.ListenAndServe(); err != nil {
     log.Fatal(err)
 }
+```
+
+For TLS via DNS-01 (e.g. for servers not reachable from the internet), inject the lego provider built with your secret token. Certificates are stored in `certs/` and renewed automatically when fewer than 30 days remain. The token is a production secret: only on the server.
+
+```go
+config := cloudflare.NewDefaultConfig()
+config.AuthToken = os.Getenv("CF_DNS_API_TOKEN") // Zone Read + DNS Edit for the one zone
+provider, err := cloudflare.NewDNSProviderConfig(config)
+if err != nil {
+    log.Fatal(err)
+}
+
+s := httpd.New(httpd.Config{
+    TLS: httpd.TLSConfig{
+        DNS01:  provider,
+        Domain: "app.example.com",
+    },
+})
 ```
 
 `Handler()` returns the fully wired `http.Handler` (static files, batteries, routes, RBAC)

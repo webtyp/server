@@ -5,16 +5,18 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-acme/lego/v4/challenge"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-const errMultipleTLSModes = "multiple TLS modes enabled; choose at most one (AutoCert, Cert/Key, or PlainHTTP)"
+const errMultipleTLSModes = "multiple TLS modes enabled; choose at most one (AutoCert, DNS01, Cert/Key, or PlainHTTP)"
 
 // TLSConfig picks how the server is reached. The zero value serves HTTPS with the
 // local certificate authority (see LocalCA): a page served by httpd is always a
 // secure context, on localhost and on a LAN. Set at most one of the fields.
 type TLSConfig struct {
 	AutoCert  bool   // public certificate from Let's Encrypt for Domain
+	DNS01     challenge.Provider // a real certificate for Domain by DNS-01; nil = off
 	Domain    string
 	CertFile  string // certificate and key provided by the operator
 	KeyFile   string
@@ -26,11 +28,15 @@ type tlsMode uint8
 const (
 	tlsLocal tlsMode = iota // zero value
 	tlsAutoCert
+	tlsDNS01
 	tlsFiles
 	tlsPlain
 )
 
 func (c TLSConfig) mode() tlsMode {
+	if c.DNS01 != nil {
+		return tlsDNS01
+	}
 	if c.AutoCert {
 		return tlsAutoCert
 	}
@@ -51,6 +57,12 @@ func (s *Server) validateTLS() error {
 			return errors.New("TLS AutoCert requires a Domain")
 		}
 	}
+	if s.config.TLS.DNS01 != nil {
+		modes++
+		if s.config.TLS.Domain == "" {
+			return errors.New("TLS DNS01 requires a Domain")
+		}
+	}
 	if s.config.TLS.CertFile != "" || s.config.TLS.KeyFile != "" {
 		modes++
 		if s.config.TLS.CertFile == "" || s.config.TLS.KeyFile == "" {
@@ -69,6 +81,17 @@ func (s *Server) validateTLS() error {
 
 func (s *Server) listenAndServe(srv *http.Server) error {
 	switch s.config.TLS.mode() {
+	case tlsDNS01:
+		d := &dns01Manager{
+			domain:   s.config.TLS.Domain,
+			provider: s.config.TLS.DNS01,
+			logf:     s.log,
+		}
+		if err := d.init(); err != nil {
+			return err
+		}
+		srv.TLSConfig = &tls.Config{GetCertificate: d.get}
+		return srv.ListenAndServeTLS("", "")
 	case tlsAutoCert:
 		m := &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
