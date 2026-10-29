@@ -2,6 +2,8 @@
 PLAN: "feat(httpd): two doors — the server listens on Port (local) and InternetPort (internet), marks each request, and demands a passkey session on the internet door"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 13851568494212893016
 ---
 
 > Read AGENTS.md at the repo root before any change.
