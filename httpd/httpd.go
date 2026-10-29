@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"webtyp.com/model"
@@ -49,6 +50,11 @@ type Server struct {
 	localCert             *localCert
 	baseHandler           http.Handler
 	baseErr               error
+
+	// dns01 is built once per Server: both doors serve the same certificate.
+	dns01     *dns01Manager
+	dns01Once sync.Once
+	dns01Err  error
 }
 
 func applyDefaults(c Config) Config {

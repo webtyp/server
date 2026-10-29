@@ -65,6 +65,11 @@ The transport marks each request with `router.ContextKeyNetwork` (`local` or `in
 
 The zero value of `TLSConfig` serves HTTPS with the local certificate authority in development **and** production. Setting `PlainHTTP: true` is the only way to serve plain HTTP (e.g. when a proxy in front terminates TLS). A page served by `httpd` is always a secure context, on `localhost` and on a LAN.
 
+### Why DNS-01 and an injected provider
+An app served inside a private network (behind a router with no open ports) still needs a certificate every phone and PC trusts without manual installation, particularly because a passkey only works over HTTPS on a trusted origin. HTTP-01/TLS-ALPN challenges cannot work because Let's Encrypt cannot reach the server. The DNS-01 challenge solves this by publishing a DNS TXT record.
+
+Because the app chooses the DNS provider (e.g., Cloudflare, Route53), the `challenge.Provider` interface is injected directly into `TLSConfig.DNS01`. This allows the application to configure the provider with its specific tokens without requiring the `httpd` package to import every possible DNS vendor.
+
 The CA route (`/__webtyp/ca`) is mounted automatically by `httpd` whenever it serves the local CA.
 
 It generates a **two-level chain**, the same shape `mkcert` and Caddy's internal PKI use:
