@@ -98,6 +98,11 @@ to report which roles hold each route's required permission; `Authorize` answers
 while `Policy` answers "who may do this?"; routes must opt into `Public()` to allow anonymous access;
 routes demanding a second factor via `RequiresMFA()` issue a 401 challenge on single-factor access).
 
+It also supports two doors: configuring `InternetPort` starts a second listener on that port. The local door
+marks requests with `router.NetworkLocal`, while the internet door marks them with `router.NetworkInternet` (accessible via `router.FromInternet(ctx)`).
+On the internet door, every route that needs an identity (guarded or authenticated) demands a passkey session
+(a multi-factor assurance level), issuing a 401 challenge on single-factor access. `Public()` routes remain accessible to anyone on both doors.
+
 ```go
 s := httpd.New(httpd.Config{
     Port:   "8080",
@@ -110,7 +115,7 @@ if err := s.ListenAndServe(); err != nil {
 ```
 
 `Handler()` returns the fully wired `http.Handler` (static files, batteries, routes, RBAC)
-without opening a port, for use with `httptest`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+without opening a port, marked as local, for use with `httptest`. `InternetHandler()` returns the exact same handler marked as coming from the internet. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 for design details.
 
 ## Documentation

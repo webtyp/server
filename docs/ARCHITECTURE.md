@@ -56,6 +56,11 @@ The server follows a **secure-by-default** model where routes are private unless
 - **Static Assets**: Files served from `PublicDir` (e.g., WASM binaries, JS, CSS) are always public. They bypass the RBAC middleware.
 - **Root Path (`/`) in Development**: The internal strategy registers a default public route for `/` that serves `PublicDir/index.html` or a diagnostic message. This ensures that the frontend application is accessible immediately without manual RBAC configuration.
 
+## The Local Door and the Internet Door
+
+The server supports running on two ports simultaneously: the local port (`Config.Port`) and the internet port (`Config.InternetPort`). Through tunnels (like Cloudflare Tunnel), every request arrives as `127.0.0.1`, and `X-Forwarded-For` is forgeable, so the **only secure way to tell the doors apart is the listener port**.
+The transport marks each request with `router.ContextKeyNetwork` (`local` or `internet`). The internet door enforces a strict passkey rule (MFA requirement) directly in the transport's gate for any route that requires an identity. This ensures the rule is applied unconditionally and cannot be accidentally bypassed by application-level route configurations.
+
 ## TLS: HTTPS by default
 
 The zero value of `TLSConfig` serves HTTPS with the local certificate authority in development **and** production. Setting `PlainHTTP: true` is the only way to serve plain HTTP (e.g. when a proxy in front terminates TLS). A page served by `httpd` is always a secure context, on `localhost` and on a LAN.

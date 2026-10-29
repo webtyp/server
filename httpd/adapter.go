@@ -470,7 +470,7 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 				ctx.Write([]byte(bodyForbidden))
 				return
 			}
-			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+			if (route.info.MFA || router.FromInternet(ctx)) && ctx.Assurance() < model.AssuranceMultiFactor {
 				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
 				ctx.WriteStatus(http.StatusUnauthorized)
 				ctx.Write([]byte(bodyUnauthorized))
@@ -484,13 +484,12 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 				ctx.Write([]byte(bodyForbidden))
 				return
 			}
-			if route.info.MFA && ctx.Assurance() < model.AssuranceMultiFactor {
+			if (route.info.MFA || router.FromInternet(ctx)) && ctx.Assurance() < model.AssuranceMultiFactor {
 				ctx.SetHeader(router.HeaderWWWAuthenticate, router.ChallengeMFARequired)
 				ctx.WriteStatus(http.StatusUnauthorized)
 				ctx.Write([]byte(bodyUnauthorized))
 				return
-			}
-			// model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
+			} // model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
 			if !model.Allowed(authorizer, ctx.UserID(), route.info.Resource, route.info.Action) {
 				ctx.WriteStatus(http.StatusForbidden)
 				ctx.Write([]byte(bodyForbidden))
