@@ -2,8 +2,10 @@
 PLAN: "feat(httpd): TLS by DNS-01 — a real Let's Encrypt certificate for a server that is not reachable from the internet (lego)"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 4497181084279041639
+PR: https://github.com/webtyp/server/pull/26
+REVIEWED_COMMIT: 1f13e38ae8b02889a3205baee604a262a5f9494b
 ---
 
 > Read AGENTS.md at the repo root before any change.
