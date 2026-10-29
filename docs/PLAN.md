@@ -2,6 +2,8 @@
 PLAN: "feat(httpd): TLS by DNS-01 — a real Let's Encrypt certificate for a server that is not reachable from the internet (lego)"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 4497181084279041639
 ---
 
 > Read AGENTS.md at the repo root before any change.
