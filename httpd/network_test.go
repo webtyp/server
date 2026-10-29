@@ -186,7 +186,10 @@ func TestDoors_HandlerSeesNetwork(t *testing.T) {
 	tsLocal := httptest.NewServer(localHandler)
 	defer tsLocal.Close()
 
-	respLocal, _ := http.Get(tsLocal.URL + "/check-network")
+	respLocal, err := http.Get(tsLocal.URL + "/check-network")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer respLocal.Body.Close()
 	bufLocal := make([]byte, 20)
 	n, _ := respLocal.Body.Read(bufLocal)
@@ -199,7 +202,10 @@ func TestDoors_HandlerSeesNetwork(t *testing.T) {
 	tsInternet := httptest.NewServer(internetHandler)
 	defer tsInternet.Close()
 
-	respInternet, _ := http.Get(tsInternet.URL + "/check-network")
+	respInternet, err := http.Get(tsInternet.URL + "/check-network")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer respInternet.Body.Close()
 	bufInternet := make([]byte, 20)
 	n, _ = respInternet.Body.Read(bufInternet)

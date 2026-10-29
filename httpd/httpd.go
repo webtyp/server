@@ -159,6 +159,7 @@ func (s *Server) base() (http.Handler, error) {
 	s.baseHandler = handler
 	return handler, nil
 }
+
 func (s *Server) ListenAndServe() error {
 	local, err := s.Handler()
 	if err != nil {
@@ -203,6 +204,7 @@ func (s *Server) ListenAndServe() error {
 	go func() { errs <- s.listenAndServe(internetSrv) }()
 	return <-errs
 }
+
 func (s *Server) log(args ...any) {
 	if s.config.Logger != nil {
 		s.config.Logger(args...)

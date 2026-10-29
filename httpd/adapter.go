@@ -489,7 +489,8 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 				ctx.WriteStatus(http.StatusUnauthorized)
 				ctx.Write([]byte(bodyUnauthorized))
 				return
-			} // model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
+			}
+			// model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
 			if !model.Allowed(authorizer, ctx.UserID(), route.info.Resource, route.info.Action) {
 				ctx.WriteStatus(http.StatusForbidden)
 				ctx.Write([]byte(bodyForbidden))
