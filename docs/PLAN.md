@@ -2,8 +2,10 @@
 PLAN: "feat(httpd): two doors — the server listens on Port (local) and InternetPort (internet), marks each request, and demands a passkey session on the internet door"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 13851568494212893016
+PR: https://github.com/webtyp/server/pull/25
+REVIEWED_COMMIT: 51fb7601dc5c8efffeebbc2a9ed7c0c0f7afc451
 ---
 
 > Read AGENTS.md at the repo root before any change.
