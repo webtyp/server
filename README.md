@@ -144,7 +144,6 @@ for design details.
 | `CLOUDFLARE_DNS_API_TOKEN` | Cloudflare token allowed to edit DNS of that domain, used only to obtain the certificate | Created once in the Cloudflare dashboard (Zone Read + DNS Edit, that zone only); stored only on the server | `ErrEnvDomainWithoutToken` |
 | `INTERNET_PORT` | Port of the internet door, reached only by the tunnel | The deployment's compose | No internet door; the app is reachable only inside the network |
 
-Use `app.example.com` in every example; never a real customer domain.
 
 ## Documentation
 
