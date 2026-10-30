@@ -2,8 +2,10 @@
 PLAN: "feat: httpd.FromEnv — doors and certificate of a self-hosted server read from the environment"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 2671701531467589963
+PR: https://github.com/webtyp/server/pull/27
+REVIEWED_COMMIT: 3f800478f6079b3d1500ed686312744ab5bcab39
 ---
 
 > Read AGENTS.md at the repo root before any change.
