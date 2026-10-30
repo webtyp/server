@@ -136,6 +136,15 @@ s := httpd.New(httpd.Config{
 without opening a port, marked as local, for use with `httptest`. `InternetHandler()` returns the exact same handler marked as coming from the internet. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 for design details.
 
+## Self-hosted server (environment)
+
+| Variable | What it is | Where it comes from | Without it |
+|---|---|---|---|
+| `APP_DOMAIN` | The name the app is reached by, inside the office network and from the internet | The deployment's compose | No real certificate; with a token or an internet port set, `FromEnv` returns the matching error |
+| `CLOUDFLARE_DNS_API_TOKEN` | Cloudflare token allowed to edit DNS of that domain, used only to obtain the certificate | Created once in the Cloudflare dashboard (Zone Read + DNS Edit, that zone only); stored only on the server | `ErrEnvDomainWithoutToken` |
+| `INTERNET_PORT` | Port of the internet door, reached only by the tunnel | The deployment's compose | No internet door; the app is reachable only inside the network |
+
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — what the `httpd` subpackage is and why:

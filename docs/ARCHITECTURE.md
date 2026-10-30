@@ -69,6 +69,7 @@ The zero value of `TLSConfig` serves HTTPS with the local certificate authority 
 An app served inside a private network (behind a router with no open ports) still needs a certificate every phone and PC trusts without manual installation, particularly because a passkey only works over HTTPS on a trusted origin. HTTP-01/TLS-ALPN challenges cannot work because Let's Encrypt cannot reach the server. The DNS-01 challenge solves this by publishing a DNS TXT record.
 
 Because the app chooses the DNS provider (e.g., Cloudflare, Route53), the `challenge.Provider` interface is injected directly into `TLSConfig.DNS01`. This allows the application to configure the provider with its specific tokens without requiring the `httpd` package to import every possible DNS vendor.
+For Cloudflare — the provider self-hosted webtyp apps use — `httpd.FromEnv()` builds it from the environment; injecting `TLSConfig.DNS01` by hand remains only for another DNS vendor. Link [docs/diagrams/FROM_ENV_FLOW.md](diagrams/FROM_ENV_FLOW.md).
 
 The CA route (`/__webtyp/ca`) is mounted automatically by `httpd` whenever it serves the local CA.
 
