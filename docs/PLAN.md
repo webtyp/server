@@ -2,6 +2,8 @@
 PLAN: "feat: httpd.FromEnv — doors and certificate of a self-hosted server read from the environment"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 2671701531467589963
 ---
 
 > Read AGENTS.md at the repo root before any change.
