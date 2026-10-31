@@ -17,6 +17,8 @@ const (
 	EnvInternetPort = "INTERNET_PORT"
 	// EnvDNSAPIToken is the Cloudflare token (Zone Read + DNS Edit on that domain) used to obtain its certificate.
 	EnvDNSAPIToken = cloudflare.EnvDNSAPIToken
+
+	fileSuffix = "_FILE"
 )
 
 // Errors returned by FromEnv; compare with err.Error().
@@ -29,6 +31,7 @@ const (
 // FromEnv returns the doors and the certificate of a self-hosted server, read
 // from the environment. With none of the three variables set it returns the
 // zero Config (local certificate authority, one door), as in development.
+// The token may come as CLOUDFLARE_DNS_API_TOKEN or CLOUDFLARE_DNS_API_TOKEN_FILE.
 //
 // Example:
 //
@@ -38,7 +41,11 @@ const (
 //	srv := httpd.New(cfg)
 func FromEnv() (Config, error) {
 	domain := os.Getenv(EnvAppDomain)
+	// The token is present as a value or as a file (Docker secrets); lego reads either.
 	token := os.Getenv(EnvDNSAPIToken)
+	if token == "" {
+		token = os.Getenv(EnvDNSAPIToken + fileSuffix)
+	}
 	internet := os.Getenv(EnvInternetPort)
 
 	var c Config
