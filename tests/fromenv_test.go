@@ -1,6 +1,8 @@
 package server_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"webtyp.com/server/httpd"
@@ -18,6 +20,7 @@ func setEnv(t *testing.T, domain, token, internet string) {
 	t.Helper()
 	t.Setenv(httpd.EnvAppDomain, domain)
 	t.Setenv(httpd.EnvDNSAPIToken, token)
+	t.Setenv(httpd.EnvDNSAPIToken+"_FILE", "")
 	t.Setenv(httpd.EnvInternetPort, internet)
 	for _, k := range []string{"CLOUDFLARE_EMAIL", "CLOUDFLARE_API_KEY", "CF_API_EMAIL", "CF_API_KEY", "CF_DNS_API_TOKEN", "CLOUDFLARE_ZONE_API_TOKEN", "CF_ZONE_API_TOKEN"} {
 		t.Setenv(k, "")
@@ -60,5 +63,43 @@ func TestFromEnv(t *testing.T) {
 				t.Fatalf("got Domain %q InternetPort %q, want %q %q", cfg.TLS.Domain, cfg.InternetPort, c.wantDomain, c.wantInternet)
 			}
 		})
+	}
+}
+
+func TestFromEnv_TokenFile(t *testing.T) {
+	setEnv(t, testDomain, "", "")
+
+	// Create token file
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(tokenFile, []byte(testToken), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(httpd.EnvDNSAPIToken+"_FILE", tokenFile)
+
+	cfg, err := httpd.FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv: %v", err)
+	}
+	if cfg.TLS.DNS01 == nil {
+		t.Fatalf("DNS01 not set")
+	}
+	if cfg.TLS.Domain != testDomain {
+		t.Fatalf("got Domain %q, want %q", cfg.TLS.Domain, testDomain)
+	}
+}
+
+func TestFromEnv_TokenFileWithoutDomain(t *testing.T) {
+	setEnv(t, "", "", "")
+
+	// Create token file
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(tokenFile, []byte(testToken), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(httpd.EnvDNSAPIToken+"_FILE", tokenFile)
+
+	_, err := httpd.FromEnv()
+	if err == nil || err.Error() != httpd.ErrEnvTokenWithoutDomain {
+		t.Fatalf("got error %v, want %q", err, httpd.ErrEnvTokenWithoutDomain)
 	}
 }

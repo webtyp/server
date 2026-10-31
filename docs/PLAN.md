@@ -2,8 +2,10 @@
 PLAN: "fix: httpd.FromEnv accepts the DNS token as a file (CLOUDFLARE_DNS_API_TOKEN_FILE)"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 13655449576233766936
+PR: https://github.com/webtyp/server/pull/28
+REVIEWED_COMMIT: f6b74a6f3985e141e959cf561d11461b73190ac7
 ---
 
 > Read AGENTS.md at the repo root before any change.
