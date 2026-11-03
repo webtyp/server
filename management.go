@@ -15,6 +15,7 @@ import (
 const (
 	LogExternalUserMain  = "External mode: user-written server main at"
 	LogExternalGenerated = "External mode: config/routes.go present, generated main from"
+	LogExternalApp       = "External mode: config declares App (appkit), generated main from"
 	LogInternalNoRoutes  = "Internal mode: no config/routes.go and no server main, checked"
 )
 
@@ -41,6 +42,8 @@ func (h *ServerHandler) StartServer(wg *sync.WaitGroup) {
 		}
 		if h.hasHandWrittenMain() {
 			decision, decisionPath = LogExternalUserMain, filepath.Join(h.AppRootDir, h.serverMainRelPath())
+		} else if HasApp(h.AppRootDir) {
+			decision, decisionPath = LogExternalApp, filepath.Join(h.AppRootDir, "config")
 		} else {
 			decision, decisionPath = LogExternalGenerated, h.routesManifestPath()
 		}

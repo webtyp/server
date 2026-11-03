@@ -207,3 +207,35 @@ func TestEscapeHatch_UserMainNotOverwritten(t *testing.T) {
 		t.Errorf("user web/server/main.go was modified:\n%s", got)
 	}
 }
+
+// TestGenerateMain_App: a project whose config/ declares `var App` (one
+// appkit.App) gets a one-line server main and the one migrate binary at the root.
+func TestGenerateMain_App(t *testing.T) {
+	root := t.TempDir()
+	const modulePath = "example.com/app"
+	writeModule(t, root, modulePath)
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte("package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{Name: \"x\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !server.HasApp(root) || !server.HasRoutes(root) {
+		t.Fatal("a config/ with `var App` is an app with a server")
+	}
+	got, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, _ := os.ReadFile(got)
+	if !strings.Contains(string(src), "appkit.Server(config.App)") {
+		t.Errorf("server main must be appkit.Server(config.App):\n%s", src)
+	}
+	mig, err := os.ReadFile(filepath.Join(root, server.GeneratedMigrateDir, server.GeneratedMainFilename))
+	if err != nil {
+		t.Fatalf("migrate/main.go not generated: %v", err)
+	}
+	if !strings.Contains(string(mig), "appkit.Migrate(config.App)") || !strings.Contains(string(mig), "DO NOT EDIT") {
+		t.Errorf("migrate main must be the generated appkit.Migrate(config.App):\n%s", mig)
+	}
+}
