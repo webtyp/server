@@ -269,8 +269,8 @@ var App = appkit.App{
 
 	// 1. web/server/main.go
 	src, _ := os.ReadFile(got)
-	if !strings.Contains(string(src), "appkit.Server(config.App, devtools.Server(config.Migrations...)...)") {
-		t.Errorf("server main must call appkit.Server with devtools.Server(config.Migrations...):\n%s", src)
+	if !strings.Contains(string(src), "appkit.Server(config.App, devtools.Server()...)") {
+		t.Errorf("server main must call appkit.Server with devtools.Server()...:\n%s", src)
 	}
 
 	// 2. migrate/main.go
@@ -278,7 +278,7 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("migrate/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Migrations...)") {
+	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, Migrations...)") {
 		t.Errorf("migrate main must call migrate.App:\n%s", mig)
 	}
 
@@ -291,27 +291,33 @@ var App = appkit.App{
 		t.Errorf("web/browser/main.go must contain //go:build wasm and appkit.Browser(config.App, devtools.Menu()):\n%s", browserMain)
 	}
 
-	// 4. config/migrations.go
-	migrationsFile, err := os.ReadFile(filepath.Join(root, "config", "migrations.go"))
+	// 4. migrate/migrations.go
+	migrationsFile, err := os.ReadFile(filepath.Join(root, server.GeneratedMigrateDir, "migrations.go"))
 	if err != nil {
-		t.Fatalf("config/migrations.go not generated: %v", err)
+		t.Fatalf("migrate/migrations.go not generated: %v", err)
 	}
 	migStr := string(migrationsFile)
 	if !strings.Contains(migStr, "//go:build !wasm") {
-		t.Errorf("config/migrations.go missing //go:build !wasm:\n%s", migStr)
+		t.Errorf("migrate/migrations.go missing //go:build !wasm:\n%s", migStr)
+	}
+	if !strings.Contains(migStr, "package main") {
+		t.Errorf("migrate/migrations.go must be package main:\n%s", migStr)
 	}
 	if !strings.Contains(migStr, `{Name: "mod1", Run: mod1migrate.Migrate}`) {
-		t.Errorf("config/migrations.go missing mod1:\n%s", migStr)
+		t.Errorf("migrate/migrations.go missing mod1:\n%s", migStr)
 	}
 	if strings.Contains(migStr, "mod2") {
-		t.Errorf("config/migrations.go unexpectedly contains mod2 (which has no migrate package):\n%s", migStr)
+		t.Errorf("migrate/migrations.go unexpectedly contains mod2 (which has no migrate package):\n%s", migStr)
 	}
 	if !strings.Contains(migStr, `{Name: "mod3", Run: mod3migrate.Migrate}`) {
-		t.Errorf("config/migrations.go missing mod3:\n%s", migStr)
+		t.Errorf("migrate/migrations.go missing mod3:\n%s", migStr)
 	}
 	idx1 := strings.Index(migStr, `{Name: "mod1"`)
 	idx3 := strings.Index(migStr, `{Name: "mod3"`)
 	if idx1 == -1 || idx3 == -1 || idx1 >= idx3 {
-		t.Errorf("expected mod1 before mod3 in config/migrations.go:\n%s", migStr)
+		t.Errorf("expected mod1 before mod3 in migrate/migrations.go:\n%s", migStr)
+	}
+	if _, err := os.Stat(filepath.Join(root, "config", "migrations.go")); !os.IsNotExist(err) {
+		t.Errorf("config/migrations.go must NOT exist")
 	}
 }
