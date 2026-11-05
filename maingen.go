@@ -557,6 +557,7 @@ func generateMigrationsFile(rootDir string) error {
 	}
 
 	_ = os.Remove(filepath.Join(rootDir, GeneratedMigrateDir, "migrations.go"))
+	_ = os.Remove(filepath.Join(rootDir, GeneratedMigrateDir, "migrations.go"))
 	return writeGenerated(filepath.Join(rootDir, "config", "migrations.go"), migrationsTemplateText, migrationsTemplateData{Steps: steps})
 }
 

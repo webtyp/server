@@ -303,6 +303,9 @@ var App = appkit.App{
 	if !strings.Contains(migStr, "package config") {
 		t.Errorf("config/migrations.go must be package config:\n%s", migStr)
 	}
+	if !strings.Contains(migStr, "package config") {
+		t.Errorf("config/migrations.go must be package config:\n%s", migStr)
+	}
 	if !strings.Contains(migStr, `{Name: "mod1", Run: mod1migrate.Migrate}`) {
 		t.Errorf("config/migrations.go missing mod1:\n%s", migStr)
 	}
@@ -342,6 +345,9 @@ var App = appkit.App{
 		if !strings.Contains(f.content, "// Why: "+f.why) {
 			t.Errorf("%s must contain '// Why: %s':\n%s", f.name, f.why, f.content)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(root, server.GeneratedMigrateDir, "migrations.go")); !os.IsNotExist(err) {
+		t.Errorf("migrate/migrations.go must NOT exist")
 	}
 }
 
