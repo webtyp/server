@@ -2,6 +2,8 @@
 PLAN: "feat: webtyp dev migrates the app's database before starting its server, with a progress line in the TUI"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 5353264496857617316
 ---
 
 > Read AGENTS.md at the repo root before any change.
