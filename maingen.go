@@ -122,7 +122,7 @@ import (
 )
 
 func main() {
-	if err := appkit.Server(config.App, devtools.Server(config.Migrations...)...); err != nil {
+	if err := appkit.Server(config.App, devtools.Server(config.Schema.Steps...)...); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -154,12 +154,12 @@ func main() {
 	drop := flag.String(migrate.FlagDrop, "", "drop one column, data included: table.column")
 	flag.Parse()
 	if *drop != "" {
-		if err := migrate.Drop(config.App.Server.Database, config.Removed, *drop); err != nil {
+		if err := migrate.Drop(config.App.Server.Database, config.Schema, *drop); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
-	left, err := migrate.App(config.App.Server.Database, log.Println, config.Removed, config.Migrations...)
+	left, err := migrate.App(config.App.Server.Database, log.Println, config.Schema)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -227,10 +227,15 @@ import (
 {{- end }}
 )
 
-var Migrations = []ddl.Step{
+// Schema is the app's database: every module's migration in App.Modules order, and the columns its models
+// no longer have (Removed, in config/removed.go).
+var Schema = ddl.Schema{
+	Steps: []ddl.Step{
 {{- range .Steps }}
-	{Name: "{{.Name}}", Run: {{.Alias}}.Migrate},
+		{Name: "{{.Name}}", Run: {{.Alias}}.Migrate},
 {{- end }}
+	},
+	Removed: Removed,
 }
 `
 

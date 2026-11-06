@@ -269,8 +269,8 @@ var App = appkit.App{
 
 	// 1. web/server/main.go
 	src, _ := os.ReadFile(got)
-	if !strings.Contains(string(src), "appkit.Server(config.App, devtools.Server(config.Migrations...)...)") {
-		t.Errorf("server main must call appkit.Server with devtools.Server(config.Migrations...):\n%s", src)
+	if !strings.Contains(string(src), "appkit.Server(config.App, devtools.Server(config.Schema.Steps...)...)") {
+		t.Errorf("server main must call appkit.Server with devtools.Server(config.Schema.Steps...):\n%s", src)
 	}
 
 	// 2. migrate/main.go
@@ -278,8 +278,8 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("migrate/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Removed, config.Migrations...)") ||
-		!strings.Contains(string(mig), "migrate.Drop(config.App.Server.Database, config.Removed, *drop)") ||
+	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Schema)") ||
+		!strings.Contains(string(mig), "migrate.Drop(config.App.Server.Database, config.Schema, *drop)") ||
 		!strings.Contains(string(mig), "flag.Bool(migrate.FlagPlan,") {
 		t.Errorf("migrate main must call migrate.App:\n%s", mig)
 	}
