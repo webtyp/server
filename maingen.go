@@ -398,7 +398,7 @@ func GenerateMain(rootDir, modulePath string, cfg MainConfig) (string, error) {
 	}
 
 	if isApp && !sameFiles(before, readFiles(appFiles)) {
-		if err := upgradeGeneratedLibraries(rootDir); err != nil {
+		if err := UpgradeGeneratedLibraries(rootDir); err != nil {
 			return "", err
 		}
 	}
@@ -416,7 +416,11 @@ const (
 	versionLatest = "@latest"
 )
 
-func upgradeGeneratedLibraries(rootDir string) error {
+// UpgradeGeneratedLibraries runs `go get <each generated library>@latest` in an appkit app: GenerateMain calls it
+// when it writes new content, and webtyp dev's «Update libraries» when the app's migration does not compile.
+//
+// Example: if err := server.UpgradeGeneratedLibraries(rootDir); err != nil { log(err) }
+func UpgradeGeneratedLibraries(rootDir string) error {
 	args := []string{goGet}
 	for _, lib := range generatedLibraries {
 		args = append(args, lib+versionLatest)
