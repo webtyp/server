@@ -1,12 +1,15 @@
 package server_test
 
 import (
+	"os/exec"
+
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"webtyp.com/command"
 
 	"webtyp.com/server"
 )
@@ -211,6 +214,7 @@ func TestEscapeHatch_UserMainNotOverwritten(t *testing.T) {
 // TestGenerateMain_App: a project whose config/ declares `var App` (one
 // appkit.App) gets server main, migrate main, browser main, and config/migrations.go.
 func TestGenerateMain_App(t *testing.T) {
+	fakeGo(t)
 	root := t.TempDir()
 	const modulePath = "example.com/app"
 	writeModule(t, root, modulePath)
@@ -354,6 +358,7 @@ var App = appkit.App{
 }
 
 func TestGenerateMain_OldHeaderRewritten(t *testing.T) {
+	fakeGo(t)
 	root := t.TempDir()
 	modulePath := "example.com/app"
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.24\n"), 0o644); err != nil {
@@ -412,6 +417,7 @@ var App = appkit.App{}
 }
 
 func TestGenerateMain_HandWrittenNotTouched(t *testing.T) {
+	fakeGo(t)
 	root := t.TempDir()
 	modulePath := "example.com/app"
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.24\n"), 0o644); err != nil {
@@ -459,6 +465,7 @@ var App = appkit.App{}
 // TestMainGen_RemovedWrittenOnce: an app gets config/removed.go with an empty list, and a later
 // generation never overwrites what webtyp dev wrote there.
 func TestMainGen_RemovedWrittenOnce(t *testing.T) {
+	fakeGo(t)
 	root := t.TempDir()
 	const modulePath = "example.com/app"
 	writeModule(t, root, modulePath)
@@ -491,5 +498,62 @@ func TestMainGen_RemovedWrittenOnce(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(removed); string(got) != answered {
 		t.Fatalf("a second generation overwrote config/removed.go:\n%s", got)
+	}
+}
+
+// fakeGo records every `go` command GenerateMain runs instead of running it (no network in tests); other commands run.
+func fakeGo(t *testing.T) *[]string {
+	t.Helper()
+	var calls []string
+	orig := command.Exec
+	command.Exec = func(name string, args ...string) *exec.Cmd {
+		if name == "go" {
+			calls = append(calls, strings.Join(args, " "))
+			return exec.Command("true")
+		}
+		return orig(name, args...)
+	}
+	t.Cleanup(func() { command.Exec = orig })
+	return &calls
+}
+
+// TestMainGen_UpgradesLibrariesWhenOutputChanges: when GenerateMain writes new content into an app's generated
+// files it upgrades the libraries the templates call, once; a generation that changes nothing runs no go command.
+func TestMainGen_UpgradesLibrariesWhenOutputChanges(t *testing.T) {
+	calls := fakeGo(t)
+	root := t.TempDir()
+	const modulePath = "example.com/app"
+	writeModule(t, root, modulePath)
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const want = "get webtyp.com/appkit@latest webtyp.com/ddl@latest webtyp.com/devtools@latest webtyp.com/migrate@latest"
+	generate := func() {
+		t.Helper()
+		if _, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	generate()
+	if len(*calls) != 1 || (*calls)[0] != want {
+		t.Fatalf("first generation: want one %q, got %q", want, *calls)
+	}
+	generate()
+	if len(*calls) != 1 {
+		t.Fatalf("nothing changed: want no new go command, got %q", *calls)
+	}
+	stale := filepath.Join(root, server.GeneratedMigrateDir, server.GeneratedMainFilename)
+	old, _ := os.ReadFile(stale)
+	if err := os.WriteFile(stale, append(old, []byte("// an older template\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	generate()
+	if len(*calls) != 2 || (*calls)[1] != want {
+		t.Fatalf("a generated file changed: want a second %q, got %q", want, *calls)
 	}
 }

@@ -2,15 +2,16 @@ package server
 
 import (
 	"bytes"
-	"go/build"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+	"webtyp.com/command"
 
 	"webtyp.com/router/routescan"
 )
@@ -349,7 +350,19 @@ func GenerateMain(rootDir, modulePath string, cfg MainConfig) (string, error) {
 	}
 
 	tmplText := mainTemplateText
-	if HasApp(rootDir) {
+	isApp := HasApp(rootDir)
+	var appFiles []string
+	var before []string
+	if isApp {
+		appFiles = []string{
+			absPath,
+			filepath.Join(rootDir, "web", "browser", GeneratedMainFilename),
+			filepath.Join(rootDir, "config", "migrations.go"),
+			filepath.Join(rootDir, GeneratedMigrateDir, GeneratedMainFilename),
+		}
+		before = readFiles(appFiles)
+	}
+	if isApp {
 		tmplText = appServerTemplateText
 		if err := writeGenerated(filepath.Join(rootDir, "web", "browser", GeneratedMainFilename), appBrowserTemplateText, data); err != nil {
 			return "", err
@@ -384,7 +397,53 @@ func GenerateMain(rootDir, modulePath string, cfg MainConfig) (string, error) {
 		return "", fmt.Errorf("writing generated main file: %w", err)
 	}
 
+	if isApp && !sameFiles(before, readFiles(appFiles)) {
+		if err := upgradeGeneratedLibraries(rootDir); err != nil {
+			return "", err
+		}
+	}
 	return absPath, nil
+}
+
+// generatedLibraries are the libraries the appkit templates call. When GenerateMain writes new content into an
+// app's generated files, it runs `go get <each>@latest` in the app: a template is only published after the
+// library API it uses, so @latest always has it, and the app never keeps a go.mod older than its generated code.
+var generatedLibraries = []string{"webtyp.com/appkit", "webtyp.com/ddl", "webtyp.com/devtools", "webtyp.com/migrate"}
+
+const (
+	goCommand     = "go"
+	goGet         = "get"
+	versionLatest = "@latest"
+)
+
+func upgradeGeneratedLibraries(rootDir string) error {
+	args := []string{goGet}
+	for _, lib := range generatedLibraries {
+		args = append(args, lib+versionLatest)
+	}
+	if out, err := command.RunInDir(rootDir, goCommand, args...); err != nil {
+		return fmt.Errorf("the generated code needs newer libraries: %w: %s", err, out)
+	}
+	return nil
+}
+
+// readFiles returns each file's content, "" when it does not exist.
+func readFiles(paths []string) []string {
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		b, _ := os.ReadFile(p)
+		out[i] = string(b)
+	}
+	return out
+}
+
+func sameFiles(a, b []string) bool {
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // writeGenerated renders tmplText to path unless path holds a hand-written file.

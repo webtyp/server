@@ -32,6 +32,7 @@ wins — the tool never overrides code the user owns — but nothing generates i
 - **`static.go`**: Static file serving from `PublicDir`. Each file carries `Cache-Control` from `pwa.CacheControl` (content-hashed names immutable, `/artifacts/` never cached, everything else revalidated) unless `NoCache` is on.
 - **`config/migrations.go`**: `var Schema = ddl.Schema{Steps: …, Removed: Removed}` — every module's migration in `App.Modules` order plus `config/removed.go`, regenerated on every build; `migrate/main.go` and `web/server/main.go` read `config.Schema`.
 - **`config/removed.go`**: Created once with `var Removed = []ddl.Removed{}`, then owned by webtyp dev's DATABASE tab. `migrate/main.go` takes `-plan` (one JSON line per leftover column on stdout) and `-drop table.column`.
+- **Library versions**: when a generation writes new content into any of an appkit app's generated files, `GenerateMain` runs `go get webtyp.com/{appkit,ddl,devtools,migrate}@latest` in the app — a template is published only after the library API it calls, so the app's `go.mod` is never older than its generated code.
 - **`enforce.go`**: RBAC enforcement based on `Requires` metadata.
 - **`tls.go` / `localcert.go` / `ca.go`**: AutoCert (Let's Encrypt), custom
   Cert/Key, PlainHTTP, and the local CA default (`LocalCA`).
