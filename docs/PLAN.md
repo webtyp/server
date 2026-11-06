@@ -2,8 +2,10 @@
 PLAN: "feat: generated migrate/main.go takes -plan and -drop and reads config/removed.go"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 4190942947438834538
+PR: https://github.com/webtyp/server/pull/29
+REVIEWED_COMMIT: 6a458ae90cd84526880d08fcf759211b40f28a43
 ---
 
 > Read AGENTS.md at the repo root before any change.

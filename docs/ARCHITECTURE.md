@@ -30,6 +30,8 @@ wins — the tool never overrides code the user owns — but nothing generates i
 - **`adapter.go`**: Implementation of `router.Router`, `router.Context`, etc., mapping them to `net/http`. `httpd` produces `router.ContextKeyRemoteAddr` from `Request.RemoteAddr`.
 - **`middleware.go`**: Built-in `Gzip` and `NoCache` middlewares.
 - **`static.go`**: Static file serving from `PublicDir`. Each file carries `Cache-Control` from `pwa.CacheControl` (content-hashed names immutable, `/artifacts/` never cached, everything else revalidated) unless `NoCache` is on.
+- **`config/migrations.go`**: `var Schema = ddl.Schema{Steps: …, Removed: Removed}` — every module's migration in `App.Modules` order plus `config/removed.go`, regenerated on every build; `migrate/main.go` and `web/server/main.go` read `config.Schema`.
+- **`config/removed.go`**: Created once with `var Removed = []ddl.Removed{}`, then owned by webtyp dev's DATABASE tab. `migrate/main.go` takes `-plan` (one JSON line per leftover column on stdout) and `-drop table.column`.
 - **`enforce.go`**: RBAC enforcement based on `Requires` metadata.
 - **`tls.go` / `localcert.go` / `ca.go`**: AutoCert (Let's Encrypt), custom
   Cert/Key, PlainHTTP, and the local CA default (`LocalCA`).
