@@ -2,6 +2,8 @@
 PLAN: "feat: generated migrate/main.go takes -plan and -drop and reads config/removed.go"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 4190942947438834538
 ---
 
 > Read AGENTS.md at the repo root before any change.
