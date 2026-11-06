@@ -122,7 +122,7 @@ import (
 )
 
 func main() {
-	if err := appkit.Server(config.App, devtools.Server(config.Schema.Steps...)...); err != nil {
+	if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil {
 		log.Fatal(err)
 	}
 }

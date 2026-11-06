@@ -269,8 +269,8 @@ var App = appkit.App{
 
 	// 1. web/server/main.go
 	src, _ := os.ReadFile(got)
-	if !strings.Contains(string(src), "appkit.Server(config.App, devtools.Server(config.Schema.Steps...)...)") {
-		t.Errorf("server main must call appkit.Server with devtools.Server(config.Schema.Steps...):\n%s", src)
+	if !strings.Contains(string(src), "appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...)") {
+		t.Errorf("server main must call appkit.Server with config.Schema and devtools.Server(config.Schema):\n%s", src)
 	}
 
 	// 2. migrate/main.go
