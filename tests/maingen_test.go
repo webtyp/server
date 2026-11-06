@@ -278,7 +278,9 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("migrate/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Migrations...)") {
+	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Removed, config.Migrations...)") ||
+		!strings.Contains(string(mig), "migrate.Drop(config.App.Server.Database, config.Removed, *drop)") ||
+		!strings.Contains(string(mig), "flag.Bool(migrate.FlagPlan,") {
 		t.Errorf("migrate main must call migrate.App:\n%s", mig)
 	}
 
@@ -451,5 +453,43 @@ var App = appkit.App{}
 	dataBrowser, _ := os.ReadFile(browserFile)
 	if string(dataBrowser) != handWrittenBrowser {
 		t.Errorf("hand-written browser main was overwritten:\n%s", string(dataBrowser))
+	}
+}
+
+// TestMainGen_RemovedWrittenOnce: an app gets config/removed.go with an empty list, and a later
+// generation never overwrites what webtyp dev wrote there.
+func TestMainGen_RemovedWrittenOnce(t *testing.T) {
+	root := t.TempDir()
+	const modulePath = "example.com/app"
+	writeModule(t, root, modulePath)
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	removed := filepath.Join(root, "config", server.GeneratedRemovedFile)
+
+	if _, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.ReadFile(removed)
+	if err != nil {
+		t.Fatalf("config/removed.go not generated: %v", err)
+	}
+	if !strings.Contains(string(first), "var Removed = []ddl.Removed{}") || !server.IsGenerated(string(first)) {
+		t.Fatalf("config/removed.go must hold an empty generated list:\n%s", first)
+	}
+
+	answered := strings.Replace(string(first), "[]ddl.Removed{}", `[]ddl.Removed{{Table: "holiday", Column: "label", MovedTo: "name"}}`, 1)
+	if err := os.WriteFile(removed, []byte(answered), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(removed); string(got) != answered {
+		t.Fatalf("a second generation overwrote config/removed.go:\n%s", got)
 	}
 }
