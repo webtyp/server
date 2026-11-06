@@ -350,6 +350,7 @@ func newExternalStrategy(h *ServerHandler) *externalStrategy {
 	}
 
 	compiler := gobuild.New(&gobuild.Config{
+		AppRootDir:                h.AppRootDir,
 		Command:                   "go",
 		MainInputFileRelativePath: filepath.Join(h.AppRootDir, mainRel),
 		OutName:                   outName,
