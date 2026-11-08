@@ -1,123 +1,78 @@
 ---
-PLAN: "fix: StartServer no llama al logger con strategyMu tomado (deadlock con la TUI de webtyp dev)"
-EXECUTOR: local (executed 2026-10-12)
+PLAN: "feat!: the generated browser main calls layoutapp.Browser — the app is the only one that chooses layout"
+EXECUTOR: antigravity
 REVIEWER: none
 ---
 
-# Plan — `webtyp.com/server`: ningún callback externo con `strategyMu` tomado
+> Read AGENTS.md at the repo root before any change.
+> **Finish by yourself:** when the delivery check passes, commit after every stage and stop. Never ask whether to
+> proceed. This plan runs **locally** and is **published as soon as the delivery check passes** (no `replace` anywhere:
+> every dependency is a published version). Never run `git reset`, `git restore`, `git checkout -- <file>` or `git stash` on your own work.
 
-## 0. Síntoma
+# Plan: generated `web/browser/main.go` on `layoutapp.Browser`
 
-`webtyp dev` en `veltylabs/modules/appointment_booking` queda congelado de forma
-intermitente (13:42 y 14:04 del 2026-10-12; a las 13:50 arrancó bien). El log
-termina en:
+## Tools
 
+```bash
+go install webtyp.com/devflow/cmd/gotest@latest
 ```
-MCP  Project loaded (build OK) — waiting for the dev server on port 8080
-MCP  stage server-boot FAILED after 5s: timeout: nothing accepted a connection on port 8080 within 5s
-MCP    ↳ the reason is in the SERVER section above …
+Runs after `webtyp/layout` (plan L3) is published: `layoutapp.Browser` must exist at `webtyp.com/layout@latest`
+(`go doc webtyp.com/layout/app Browser`); no `replace` in `go.mod`.
+
+## Why
+
+Decision D16 of `webtyp/docs/ARCHITECTURE_MASTER_PLAN.md`: `appkit.Browser` moved to `webtyp.com/layout/app`
+(`layoutapp.Browser`, plan L3 in `webtyp/layout`) so that `appkit` — imported by every module — no longer requires
+`layout`. The app's generated browser main is now the one place that imports the chassis.
+
+## APIs used
+
+| Symbol | Signature | From |
+|---|---|---|
+| `layoutapp.Browser` | `func Browser(app appkit.App, tools app.Tools)` — package `webtyp.com/layout/app`, `//go:build wasm` | plan L3 |
+| `devtools.Menu` | `func Menu() app.Tools` (`webtyp.com/devtools`, `//go:build dev`) | unchanged |
+
+## Stage 1 — `maingen.go`
+
+1. `appBrowserTemplateText` (line 194): the import block becomes
+
+```go
+import (
+	layoutapp "webtyp.com/layout/app"
+	"webtyp.com/devtools"
+
+	"{{.ModulePath}}/config"
+)
+
+func main() {
+	layoutapp.Browser(config.App, devtools.Menu())
+}
+```
+   and the `// Why:` line ends with «the chassis (webtyp.com/layout) is chosen here, by the app, and by no module».
+2. `generatedLibraries` (line 411): add `"webtyp.com/layout"` (the template now calls it; the app's `go.mod` must require
+   it at `@latest`).
+
+## Stage 2 — tests
+
+`tests/maingen_test.go:296-297`: the expected text becomes `layoutapp.Browser(config.App, devtools.Menu())` and the
+message says so. New row in `docs/TESTS.md` if the file lists that test.
+
+## Stage 3 — documentation
+
+`README.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`: every `appkit.Browser(config.App, devtools.Menu())` →
+`layoutapp.Browser(config.App, devtools.Menu())` (`grep -rn "appkit.Browser" .` → empty).
+
+## Delivery check
+
+```bash
+gotest
+grep -rn "appkit.Browser" .   # empty
 ```
 
-La sección SERVER está vacía: el servidor nunca escribe ni su primera línea
-(`Internal mode: …`). El diagnóstico manda a leer un error que no existe.
-`item_catalog` "funciona" solo por timing.
+A PR that does not compile, or whose tests could not run, is a failed delivery.
 
-## 1. Causa (verificada con `dlv attach` al daemon v0.6.139, server v0.2.77)
-
-Deadlock por orden de locks entre dos goroutines:
-
-| Goroutine | Tiene | Espera | Pila |
-|---|---|---|---|
-| 196 — arranque | `ServerHandler.strategyMu` (Lock) | mutex de `HeadlessTUI` | `StartServer` (management.go:45) → `h.log` → `onLog` → `HeadlessTUI.RelayLog` (`t.mu.Lock`) |
-| 73 — `GET /webtyp/state` (la TUI de `webtyp dev` sondea) | mutex de `HeadlessTUI` (RLock) | `strategyMu` (RLock) | `HeadlessTUI.GetHandlerStates` → `tui.Extract` → `ServerHandler.Value` (tui.go:18) |
-
-`StartServer` toma `strategyMu.Lock()` en management.go:33 y, **sin soltarlo**,
-llama a `h.log(...)` (líneas 40, 42, 45). `h.log` ejecuta `onLog`, un callback
-ajeno al paquete, que puede bloquear o volver a entrar al `ServerHandler`.
-
-Se dispara solo cuando la TUI sondea el estado en la misma ventana en que
-arranca el servidor. Por eso `start_development` por MCP (sin TUI que sondee)
-siempre arranca, y `webtyp dev` a veces no.
-
-### Mismo defecto en otros sitios del paquete
-
-- `switch_mode.go` `CreateTemplateServer`: llama a `h.log` con el lock tomado
-  (líneas 15, 19, 25, 30) **y** retorna en las ramas de error de las líneas
-  21–22 y 26–27 **sin `Unlock`**: si falla `Stop()` o `ensureServerMain`, el
-  lock queda tomado para siempre y el próximo `Value()`/`StartServer` cuelga.
-- `server.go` `SetExternalServerMode`: `defer Unlock` y `h.log` adentro
-  (líneas 291, 299…).
-- `management.go` `Restart`: `h.log` bajo `RLock` (línea 107). Con un escritor
-  esperando, `RWMutex` bloquea a los lectores nuevos y cierra el mismo ciclo.
-
-Regla que se viola: **nunca invocar código ajeno (`onLog`, `strategy.Start/Stop`,
-que también loguean) mientras se tiene `strategyMu`**. Se toma el lock solo
-para leer o escribir los campos (`strategy`, `executionInternal`) y se suelta
-antes de loguear o actuar.
-
-## 2. Por qué los tests actuales no lo detectan
-
-Todos los tests configuran un logger inerte (`t.Log` o append a un slice) que
-nunca vuelve a entrar al handler. Ningún test reproduce lo que hace la TUI real:
-leer `Value()` desde el callback de log o en paralelo con el arranque.
-
-## 3. Etapas
-
-| # | Etapa | Archivos | Commit |
-|---|---|---|---|
-| 1 | Test en rojo | `tests/log_reentrancy_test.go` (nuevo) | `test: logger re-entering the handler during StartServer must not deadlock` |
-| 2 | Arreglo | `management.go`, `switch_mode.go`, `server.go` | `fix: never call the logger or the strategy while holding strategyMu` |
-
-### Etapa 1 — `tests/log_reentrancy_test.go` (`package tests`, solo API pública)
-
-1. `TestStartServerLoggerMayReadValue`: `server.New()`, `SetAppRootDir(t.TempDir())`
-   (sin `config/routes.go` → modo interno), `SetPort` con un puerto libre,
-   `SetExitChan(exit)`, y
-   `SetLogger(func(...any) { _ = h.Value() })`, que es justo lo que hace la TUI.
-   Lanza `go h.StartServer(&wg)` y espera hasta 3 s a que el puerto acepte
-   conexiones. Hoy **cuelga**: `Value()` pide `RLock` en la misma goroutine que
-   tiene `Lock`. El test falla por timeout con el mensaje
-   `StartServer deadlocked: logger re-entered Value() while strategyMu was held`.
-   Al final cierra `exit` y espera `wg`.
-2. `TestStartServerConcurrentValue`: logger inerte; una goroutine llama a
-   `h.Value()` en bucle durante el arranque. El puerto debe responder antes de 3 s.
-
-Correr `gotest`: el test 1 debe fallar (rojo) antes de la etapa 2.
-
-### Etapa 2 — soltar el lock antes de loguear o actuar
-
-**`management.go` `StartServer`:** dentro del lock solo se decide y se guardan
-los datos en variables locales (`isInternal`, `strategy`, el mensaje y su ruta).
-Se hace `Unlock` y **después** se llama a `h.log(...)`. La lógica de decisión no
-cambia.
-
-**`management.go` `Restart`:** copiar `h.strategy` bajo `RLock`, soltar, y luego
-loguear y llamar a `Restart()` sobre la copia.
-
-**`switch_mode.go` `CreateTemplateServer`:** con el lock solo leer
-`executionInternal` y `h.strategy`. Soltar. Loguear, hacer `Stop()` y
-`ensureServerMain(true)` fuera del lock. Volver a tomar el lock solo para
-asignar `executionInternal = false` y `h.strategy = newExternalStrategy(h)`.
-Ninguna rama de error puede retornar con el lock tomado.
-
-**`server.go` `SetExternalServerMode`:** mismo patrón: leer y escribir los campos
-bajo lock, y hacer `log`, `Stop()`, `Start()` y `ensureServerMain` fuera de él.
-
-Comentario en `strategyMu` (server.go:66): `// protects strategy and executionInternal only — never call onLog or a strategy method while holding it`.
-
-Correr `gotest`: `vet ✅, race ✅, tests ✅`, incluidos los dos tests nuevos.
-
-## 4. Fuera de este plan (anotado, no se toca)
-
-`webtyp/app` `HeadlessTUI.GetHandlerStates` (headless_tui.go:209) llama a
-`tui.Extract(handler)`, código de cada handler, con `t.mu` tomado. Es el mismo
-antipatrón del otro lado. Con este plan el ciclo ya se rompe; endurecer `app`
-(copiar los handlers bajo lock y extraer fuera) queda como plan propio en
-`webtyp/app` si lo apruebas.
-
-## 5. Entrega
-
-`gopush` en `webtyp/server`. Después, actualizar la dependencia en `webtyp/app`
-y publicar una release de `webtyp` para que `webtyp update` instale un binario
-corregido. Mientras tanto, si se congela: `webtyp stop` y `webtyp dev` de nuevo
-(es una carrera, normalmente el segundo intento arranca).
+| Stage | Files |
+|---|---|
+| 1 | `maingen.go` |
+| 2 | `tests/maingen_test.go` |
+| 3 | `README.md`, `docs/*.md` |

@@ -5,7 +5,7 @@
 
 `docs/PLAN.md` is the spec: no design judgment; anything unclear is a question in the PR, not a guess.
 
-- Public API: typed (no `any`/`interface{}`), explicit, minimal; never export a symbol only a test uses.
+- Public API: typed (no `any`/`interface{}`), explicit, sequential, minimal; no generics (`[T any]`) or `reflect` without benchmarked allocation/performance justification and owner approval; never export a symbol only a test uses.
 - One intent, one path: the old path is deleted in the same change. No silent fallback, `TODO`, commented code or stub.
 - Fail at compile time, else a loud diagnostic — never silently. Zero values deny.
 - A defect in a dependency is reported, never wrapped or patched here.

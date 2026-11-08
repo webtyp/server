@@ -293,8 +293,8 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("web/browser/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "appkit.Browser(config.App, devtools.Menu())") {
-		t.Errorf("web/browser/main.go must contain //go:build wasm and appkit.Browser(config.App, devtools.Menu()):\n%s", browserMain)
+	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "layoutapp.Browser(config.App, devtools.Menu())") {
+		t.Errorf("web/browser/main.go must contain //go:build wasm and layoutapp.Browser(config.App, devtools.Menu()):\n%s", browserMain)
 	}
 
 	// 4. config/migrations.go
@@ -337,7 +337,7 @@ var App = appkit.App{
 		why     string
 	}{
 		{"web/server/main.go", string(src), "the server binary of this app; dev tools (database diagram, API explorer) come from webtyp.com/devtools and exist only with -tags dev."},
-		{"web/browser/main.go", string(browserMain), "the browser (wasm) binary of this app; the «Developer tools» menu comes from webtyp.com/devtools and exists only with -tags dev."},
+		{"web/browser/main.go", string(browserMain), "the browser (wasm) binary of this app; the «Developer tools» menu comes from webtyp.com/devtools and exists only with -tags dev; the chassis (webtyp.com/layout) is chosen here, by the app, and by no module."},
 		{"migrate/main.go", string(mig), "the migration binary: webtyp dev runs it on start and when a model or go.mod changes; the self-host supervisor runs it before each new version (webtyp.com/migrate)."},
 		{"config/migrations.go", migStr, "the migrations of App.Modules in the same order, read by migrate/main.go and by the dev database diagram; build tag !wasm keeps it out of the browser."},
 	}
@@ -531,7 +531,7 @@ func TestMainGen_UpgradesLibrariesWhenOutputChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	const want = "get webtyp.com/appkit@latest webtyp.com/ddl@latest webtyp.com/devtools@latest webtyp.com/migrate@latest"
+	const want = "get webtyp.com/appkit@latest webtyp.com/ddl@latest webtyp.com/devtools@latest webtyp.com/layout@latest webtyp.com/migrate@latest"
 	generate := func() {
 		t.Helper()
 		if _, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"}); err != nil {

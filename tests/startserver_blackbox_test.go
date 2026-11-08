@@ -75,18 +75,18 @@ func TestCreateTemplateServerGeneratesFile(t *testing.T) {
 	defer ticker.Stop()
 
 	fileFound := false
+pollLoop:
 	for {
 		select {
 		case <-timeout:
-			break // break loop, check fileFound later
+			break pollLoop
 		case <-ticker.C:
 			if _, statErr := os.Stat(target); statErr == nil {
 				fileFound = true
-				goto Found
+				break pollLoop
 			}
 		}
 	}
-Found:
 
 	if !fileFound {
 		t.Fatalf("expected generated server file at %s, but not found within timeout", target)
@@ -113,9 +113,7 @@ Found:
 	mu.Lock()
 	out := strings.Join(logMessages, "\n")
 	mu.Unlock()
-	if !strings.Contains(out, "Generating server files") {
-		// Verify h.executionInternal is now false (logic switched strategy before Compile)
-	}
+	_ = out
 
 	if h.Value() != "external" {
 		t.Error("Expected to be in External mode logic (h.executionInternal = false) even if compilation failed")

@@ -140,7 +140,7 @@ func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
 
 // discardSuppressed undoes every header written by the response we swallowed.
 func (r *statusRecorder) discardSuppressed() {
-	h := r.ResponseWriter.Header()
+	h := r.Header()
 	for k := range h {
 		delete(h, k)
 	}

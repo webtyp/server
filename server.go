@@ -128,35 +128,35 @@ func New() *ServerHandler {
 
 // SetAppRootDir sets the application root directory
 func (h *ServerHandler) SetAppRootDir(dir string) {
-	h.Config.AppRootDir = dir
+	h.AppRootDir = dir
 }
 
 // SetSourceDir sets the source directory relative to AppRootDir
 func (h *ServerHandler) SetSourceDir(dir string) {
-	h.Config.SourceDir = dir
+	h.SourceDir = dir
 }
 
 // SetOutputDir sets the output directory relative to AppRootDir
 func (h *ServerHandler) SetOutputDir(dir string) {
-	h.Config.OutputDir = dir
+	h.OutputDir = dir
 }
 
 // SetPublicDir sets the public directory
 func (h *ServerHandler) SetPublicDir(dir string) *ServerHandler {
-	h.Config.PublicDir = dir
+	h.PublicDir = dir
 	return h
 }
 
 // SetMainInputFile sets the main input file name
 func (h *ServerHandler) SetMainInputFile(name string) {
-	h.Config.MainInputFile = name
+	h.MainInputFile = name
 	h.mainFileExternalServer = name
 }
 
 // SetPort sets the server port
 func (h *ServerHandler) SetPort(port string) {
 	h.portMu.Lock()
-	h.Config.AppPort = port
+	h.AppPort = port
 	h.portMu.Unlock()
 }
 
@@ -164,34 +164,33 @@ func (h *ServerHandler) SetPort(port string) {
 func (h *ServerHandler) Port() string {
 	h.portMu.RLock()
 	defer h.portMu.RUnlock()
-	return h.Config.AppPort
+	return h.AppPort
 }
 
 // SetHTTPS enables or disables HTTPS. The default is true; passing false is an
 // explicit, deliberate opt-out — never a silent default, never read from a
 // gitignored file.
 func (h *ServerHandler) SetHTTPS(enabled bool) *ServerHandler {
-	h.Config.Https = enabled
+	h.Https = enabled
 	return h
 }
 
 // SetLogger sets the logger function
 func (h *ServerHandler) SetLogger(fn func(...any)) *ServerHandler {
-	h.Config.Logger = fn
+	h.Logger = fn
 	h.onLog = fn
 	return h
 }
 
 // SetExitChan sets the exit channel
 func (h *ServerHandler) SetExitChan(ch chan bool) *ServerHandler {
-	h.Config.ExitChan = ch
+	h.ExitChan = ch
 	return h
 }
 
 // SetStore sets the persistent store
 func (h *ServerHandler) SetStore(s Store) *ServerHandler {
 	if s != nil {
-		h.Config.Store = s
 		h.Store = s
 	}
 	return h
@@ -200,7 +199,6 @@ func (h *ServerHandler) SetStore(s Store) *ServerHandler {
 // SetUI sets the UI interface
 func (h *ServerHandler) SetUI(ui UI) *ServerHandler {
 	if ui != nil {
-		h.Config.UI = ui
 		h.UI = ui
 	}
 	return h
@@ -218,29 +216,29 @@ func (h *ServerHandler) SetUI(ui UI) *ServerHandler {
 //
 // RestartServer does NOT invoke this hook.
 func (h *ServerHandler) SetBeforeExternalServerStart(fn func() error) *ServerHandler {
-	h.Config.BeforeExternalServerStart = fn
+	h.BeforeExternalServerStart = fn
 	return h
 }
 
 // SetGitIgnoreAdd sets the callback to add entries to .gitignore
 func (h *ServerHandler) SetGitIgnoreAdd(fn func(string) error) *ServerHandler {
-	h.Config.GitIgnoreAdd = fn
+	h.GitIgnoreAdd = fn
 	return h
 }
 
 // SetCompileArgs sets the arguments for compiling the server
 func (h *ServerHandler) SetCompileArgs(fn func() []string) {
-	h.Config.ArgumentsForCompilingServer = fn
+	h.ArgumentsForCompilingServer = fn
 }
 
 // SetRunArgs sets the arguments for running the server
 func (h *ServerHandler) SetRunArgs(fn func() []string) {
-	h.Config.ArgumentsToRunServer = fn
+	h.ArgumentsToRunServer = fn
 }
 
 // SetDisableGlobalCleanup enables or disables global cleanup
 func (h *ServerHandler) SetDisableGlobalCleanup(disable bool) {
-	h.Config.DisableGlobalCleanup = disable
+	h.DisableGlobalCleanup = disable
 }
 
 // RegisterRoutes appends fn to the internal route list.
