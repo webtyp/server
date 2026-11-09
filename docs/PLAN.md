@@ -2,8 +2,10 @@
 PLAN: "feat: httpd decodes the arguments of a GET from its query; one query reader (router.QueryReader) replaces the private form reader"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 1175233284267127082
+PR: https://github.com/webtyp/server/pull/30
+REVIEWED_COMMIT: 3fa0287a73255fe8046f7c06a375dbe029eb1f77
 ---
 
 > Read AGENTS.md at the repo root before any change.
