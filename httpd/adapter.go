@@ -89,8 +89,12 @@ func (c *httpContext) Write(b []byte) (int, error) {
 	return c.w.Write(b)
 }
 
+// Decode reads the arguments of the request into a typed destination. A GET carries them in its query (and never in a body);
+// every other method carries them in its body.
 func (c *httpContext) Decode(into model.Decodable) error {
-	return decodeBody(c, into)
+	return router.DecodeArgs(c.r.Method, router.QueryOf(c.Path()), c.Body(), into, func(_ []byte, d model.Decodable) error {
+		return decodeBody(c, d) // JSON or form, by Content-Type
+	})
 }
 
 func (c *httpContext) Encode(v model.Encodable) error {
