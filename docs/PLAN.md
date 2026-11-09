@@ -2,8 +2,10 @@
 PLAN: "feat: httpd decodes the arguments of a GET from its query; one query reader (router.QueryReader) replaces the private form reader"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 1175233284267127082
+PR: https://github.com/webtyp/server/pull/30
+REVIEWED_COMMIT: 3fa0287a73255fe8046f7c06a375dbe029eb1f77
 ---
 
 > Read AGENTS.md at the repo root before any change.
@@ -71,6 +73,7 @@ func newTestContextAt(method, target string, body []byte) *httpContext {
 | `TestDecode_PatchAndDeleteReadTheBody` | `PATCH` and `DELETE` with JSON body `{"code":"abc","qty":3,"active":true}` and `Content-Type: application/json` → decoded; a query on those requests is ignored |
 | `TestDecode_GetNestedObjectUsesPrefix` | a target whose `DecodeFields` calls `r.Object("filter", &inner)`; `GET /x?filter.name=x` → `inner.Name=="x"` |
 | `TestRoute_PatchIsGated` | register `r.Handle("PATCH", "/api/m/e", h).Requires("e", model.Update)` on an `httpRouter` with an `Authorize` that denies → a `PATCH` answers 403 and `h` is not called; with an authorizer that allows → `h` runs (proves an update is gated like every other route) |
+| `TestFormDecode_MalformedEscapeIsOpaque` | a form body `code=%zz` decodes without error and the handler receives the value exactly as written (`%zz`), never a different value and never a panic |
 
 The existing `TestFormDecode_*` tests (form bodies, charset, JSON, missing keys, `active=on`) must stay green unchanged: they prove `router.QueryReader` replaces `formReader` with the same behaviour.
 Run `gotest`: the new tests fail. Commit: `test: GET decodes its query (red)`.
