@@ -2,8 +2,10 @@
 PLAN: "feat!: httpd Context.Path() is the path only and RawQuery() is the query (router v0.5.0)"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 661305067297468528
+PR: https://github.com/webtyp/server/pull/31
+REVIEWED_COMMIT: b42a71ebb80a1e514ae12759506f97fd1de72839
 ---
 
 > Read AGENTS.md at the repo root before any change.
