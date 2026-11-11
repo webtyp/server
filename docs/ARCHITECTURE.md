@@ -27,7 +27,7 @@ wins — the tool never overrides code the user owns — but nothing generates i
 
 ## Components
 
-- **`adapter.go`**: Implementation of `router.Router`, `router.Context`, etc., mapping them to `net/http`. `httpd` produces `router.ContextKeyRemoteAddr` from `Request.RemoteAddr`. A GET is decoded from its query, every other method from its body; a form body goes through the same reader. `httpd` never logs a query.
+- **`adapter.go`**: Implementation of `router.Router`, `router.Context`, etc., mapping them to `net/http`. `httpd` produces `router.ContextKeyRemoteAddr` from `Request.RemoteAddr`. A GET is decoded from its query, every other method from its body; a form body goes through the same reader. `httpd` never logs a query. The `Path()` method returns the path only, and `RawQuery()` returns the query.
 - **`middleware.go`**: Built-in `Gzip` and `NoCache` middlewares.
 - **`static.go`**: Static file serving from `PublicDir`. Each file carries `Cache-Control` from `pwa.CacheControl` (content-hashed names immutable, `/artifacts/` never cached, everything else revalidated) unless `NoCache` is on.
 - **`config/migrations.go`**: `var Schema = ddl.Schema{Steps: …, Removed: Removed}` — every module's migration in `App.Modules` order plus `config/removed.go`, regenerated on every build; `migrate/main.go` and `web/server/main.go` read `config.Schema`.

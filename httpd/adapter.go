@@ -38,13 +38,11 @@ func (c *httpContext) Method() string {
 	return c.r.Method
 }
 
-// Path returns the request path with its query string, if any: router.QueryParam reads it from here.
-func (c *httpContext) Path() string {
-	if c.r.URL.RawQuery == "" {
-		return c.r.URL.Path
-	}
-	return c.r.URL.Path + "?" + c.r.URL.RawQuery
-}
+// Path returns the path of the request only, never its query (the router contract).
+func (c *httpContext) Path() string { return c.r.URL.Path }
+
+// RawQuery returns the query of the request without the "?", "" when there is none.
+func (c *httpContext) RawQuery() string { return c.r.URL.RawQuery }
 
 // Param returns a path parameter the matched route declared with {name}.
 //
@@ -92,7 +90,7 @@ func (c *httpContext) Write(b []byte) (int, error) {
 // Decode reads the arguments of the request into a typed destination. A GET carries them in its query (and never in a body);
 // every other method carries them in its body.
 func (c *httpContext) Decode(into model.Decodable) error {
-	return router.DecodeArgs(c.r.Method, router.QueryOf(c.Path()), c.Body(), into, func(_ []byte, d model.Decodable) error {
+	return router.DecodeArgs(c.r.Method, c.RawQuery(), c.Body(), into, func(_ []byte, d model.Decodable) error {
 		return decodeBody(c, d) // JSON or form, by Content-Type
 	})
 }

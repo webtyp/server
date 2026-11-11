@@ -127,6 +127,28 @@ func TestHTTPContextCookieReadSameSite(t *testing.T) {
 	}
 }
 
+func TestHTTPContext_PathAndRawQuery(t *testing.T) {
+	req1 := httptest.NewRequest(http.MethodPost, "/api/q?a=1&b=two", nil)
+	ctx1 := &httpContext{w: httptest.NewRecorder(), r: req1}
+
+	if ctx1.Path() != "/api/q" {
+		t.Errorf("expected Path() to be /api/q, got %q", ctx1.Path())
+	}
+	if ctx1.RawQuery() != "a=1&b=two" {
+		t.Errorf("expected RawQuery() to be a=1&b=two, got %q", ctx1.RawQuery())
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/api/q", nil)
+	ctx2 := &httpContext{w: httptest.NewRecorder(), r: req2}
+
+	if ctx2.Path() != "/api/q" {
+		t.Errorf("expected Path() to be /api/q, got %q", ctx2.Path())
+	}
+	if ctx2.RawQuery() != "" {
+		t.Errorf("expected RawQuery() to be empty without a query, got %q", ctx2.RawQuery())
+	}
+}
+
 func TestHTTPContextMethods(t *testing.T) {
 	body := []byte("test body")
 	req := httptest.NewRequest(http.MethodPost, "/api/test", bytes.NewReader(body))
