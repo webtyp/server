@@ -147,7 +147,7 @@ for design details.
 
 ## Documentation
 
-- `Decode` picks its source per method: a GET decodes its query, every other method its body.
+- `Decode` picks its source per method: a GET decodes its query, every other method its body. The `Path()` method returns the path only, and `RawQuery()` returns the query.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — what the `httpd` subpackage is and why:
   the generated server entry point, RBAC enforcement, and the development TLS chain.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — decisions and rejected alternatives, including

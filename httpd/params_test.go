@@ -70,14 +70,15 @@ func TestRegistrationRejectsWildcard(t *testing.T) {
 	s.Router().Get("/x/{a...}", func(ctx router.Context) {})
 }
 
-// router.QueryParam(ctx.Path(), key) is how handlers read the query string (router's contract:
-// Path may carry it), so Path must keep it.
-func TestPathKeepsQueryString(t *testing.T) {
+// router v0.5.0 contract: Path() returns the path only and RawQuery() returns the query string.
+func TestPathAndRawQuery(t *testing.T) {
 	s := New(Config{})
-	var gotPath, gotCursor string
+	var gotPath, gotQuery, gotCursor string
 	s.Router().Get("/api/pull", func(ctx router.Context) {
 		gotPath = ctx.Path()
-		gotCursor, _ = router.QueryParam(ctx.Path(), "cursor")
+		gotQuery = ctx.RawQuery()
+		reader := router.QueryReader(ctx.RawQuery())
+		gotCursor, _ = reader.String("cursor")
 		ctx.WriteStatus(http.StatusOK)
 	}).Public()
 
@@ -93,10 +94,13 @@ func TestPathKeepsQueryString(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", w.Code)
 	}
-	if gotPath != "/api/pull?cursor=42&limit=5" {
-		t.Errorf("Path() = %q, want the path with its query string", gotPath)
+	if gotPath != "/api/pull" {
+		t.Errorf("Path() = %q, want only the path", gotPath)
+	}
+	if gotQuery != "cursor=42&limit=5" {
+		t.Errorf("RawQuery() = %q, want the query string", gotQuery)
 	}
 	if gotCursor != "42" {
-		t.Errorf("QueryParam(cursor) = %q, want %q", gotCursor, "42")
+		t.Errorf("QueryReader(cursor) = %q, want %q", gotCursor, "42")
 	}
 }
