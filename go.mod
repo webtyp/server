@@ -28,5 +28,5 @@ require (
 	golang.org/x/tools v0.45.0 // indirect
 	howett.net/plist v1.0.0 // indirect
 	webtyp.com/escape v0.1.0 // indirect
-	webtyp.com/fmt v1.0.1 // indirect
+	webtyp.com/fmt v1.0.2 // indirect
 )
