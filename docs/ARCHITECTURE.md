@@ -11,9 +11,10 @@ The development mode's `internalStrategy` (in-memory server) consumes the `httpd
 A project does not contain an HTTP `main()`. [webtyp.com/appkitc](https://github.com/webtyp/appkitc) writes one to
 `web/server/main.go` — inside the project, because outside the module tree
 the Go toolchain cannot resolve the project's own imports — and the External
-strategy compiles and runs it. `generator.go` (`RunGenerator`) does not carry the
-templates: it asks Go to run the `appkitc` version the app's `go.mod` pins with a
-`tool` line, and adds that line the first time.
+strategy compiles and runs it. `generator.go` (`MainGenerator`) does not carry the
+templates: the program that starts the handler connects `appkitc` with `SetMainGenerator`
+(`server` cannot import it: `appkitc` imports `server`), and without one the handler
+fails with `ErrNoMainGenerator`.
 
 The generated main imports the project's `routes` package and calls
 `routes.Register` on the server it builds, so development and production serve
@@ -34,7 +35,7 @@ wins — the tool never overrides code the user owns — but nothing generates i
 - **`static.go`**: Static file serving from `PublicDir`. Each file carries `Cache-Control` from `pwa.CacheControl` (content-hashed names immutable, `/artifacts/` never cached, everything else revalidated) unless `NoCache` is on.
 - **`config/migrations.go`**: `var Schema = ddl.Schema{Steps: …, Removed: Removed}` — every module's migration in `App.Modules` order plus `config/removed.go`, regenerated on every build; `migrate/main.go` and `web/server/main.go` read `config.Schema`.
 - **`config/removed.go`**: Created once with `var Removed = []ddl.Removed{}`, then owned by webtyp dev's DATABASE tab. `migrate/main.go` takes `-plan` (one JSON line per leftover column on stdout) and `-drop table.column`.
-- **Generator version**: the templates live in `webtyp.com/appkitc`, not here. The app pins it in its `go.mod` (`tool webtyp.com/appkitc/cmd/appkitc`), so its templates always match the libraries the app chose; `UpgradeGenerator` takes the newest one (`go get webtyp.com/appkitc@latest`). `project.go` keeps what the handler itself needs to decide: `HasApp`, `HasRoutes`, `HasRunServer`, `IsGenerated`, `ReadModulePath` and `MainConfig`.
+- **Generator**: the templates live in `webtyp.com/appkitc` and the program that starts the handler connects it; `project.go` keeps what the handler itself needs to decide: `HasApp`, `HasRoutes`, `HasRunServer`, `IsGenerated`, `ReadModulePath` and `MainConfig`.
 - **`enforce.go`**: RBAC enforcement based on `Requires` metadata.
 - **`tls.go` / `localcert.go` / `ca.go`**: AutoCert (Let's Encrypt), custom
   Cert/Key, PlainHTTP, and the local CA default (`LocalCA`).

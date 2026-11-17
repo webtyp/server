@@ -67,5 +67,8 @@ func (h *ServerHandler) ensureServerMain(force bool) error {
 		PublicDir: h.PublicDir,
 		PlainHTTP: !h.Https,
 	}
-	return RunGenerator(h.AppRootDir, cfg)
+	if h.mainGenerator == nil {
+		return ErrNoMainGenerator
+	}
+	return h.mainGenerator(h.AppRootDir, cfg)
 }

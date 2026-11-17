@@ -3,143 +3,76 @@ package server_test
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
-	"webtyp.com/command"
 	"webtyp.com/server"
 )
 
-const (
-	toolDirective = "tool " + server.GeneratorToolPath + "\n"
-	getToolCall   = "get -tool " + server.GeneratorToolPath + "@latest"
-)
-
-// goRecorder holds every `go` command the handler ran instead of running it (no network in tests).
-type goRecorder struct {
+// genRecorder is a generator that records how the handler called it instead of writing files.
+type genRecorder struct {
 	mu    sync.Mutex
-	calls []string
+	calls []server.MainConfig
+	roots []string
 }
 
-func (r *goRecorder) Calls() []string {
+func (r *genRecorder) Generate(rootDir string, cfg server.MainConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return append([]string(nil), r.calls...)
+	r.roots = append(r.roots, rootDir)
+	r.calls = append(r.calls, cfg)
+	return nil
 }
 
-// fakeGo records `go` commands without running them; a command whose arguments contain failing exits with an error.
-// Other commands run.
-func fakeGo(t *testing.T, failing string) *goRecorder {
-	t.Helper()
-	rec := &goRecorder{}
-	orig := command.Exec
-	command.Exec = func(name string, args ...string) *exec.Cmd {
-		if name != "go" {
-			return orig(name, args...)
-		}
-		joined := strings.Join(args, " ")
-		rec.mu.Lock()
-		rec.calls = append(rec.calls, joined)
-		rec.mu.Unlock()
-		if failing != "" && strings.Contains(joined, failing) {
-			return exec.Command("false")
-		}
-		return exec.Command("true")
-	}
-	t.Cleanup(func() { command.Exec = orig })
+func (r *genRecorder) Calls() []server.MainConfig {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]server.MainConfig(nil), r.calls...)
+}
+
+// useRecorder connects a recording generator to h.
+func useRecorder(h *server.ServerHandler) *genRecorder {
+	rec := &genRecorder{}
+	h.SetMainGenerator(rec.Generate)
 	return rec
 }
 
-func writeModule(t *testing.T, root, extra string) {
+func writeModule(t *testing.T, root string) {
 	t.Helper()
-	src := "module example.com/app\n\ngo 1.25\n\n" + extra
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/app\n\ngo 1.25\n"), 0o644); err != nil {
 		t.Fatalf("writing go.mod: %v", err)
 	}
 }
 
-func hasCall(calls []string, prefix string) bool {
-	for _, c := range calls {
-		if strings.HasPrefix(c, prefix) {
-			return true
-		}
-	}
-	return false
-}
+// The handler asks the connected generator for the app's main files with the port, the public folder and the protocol it holds.
+func TestCreateTemplateServer_AsksTheConnectedGenerator(t *testing.T) {
+	tmp := t.TempDir()
+	h := newTestHandler(t, "web/server", "web/server", tmp)
+	rec := useRecorder(h)
+	writeRoutesFile(t, tmp)
+	close(h.ExitChan)
 
-// An app whose go.mod has no tool line gets it first, then the generator runs with the flags the handler holds.
-func TestRunGenerator_AddsTheToolThenRunsIt(t *testing.T) {
-	rec := fakeGo(t, "")
-	root := t.TempDir()
-	writeModule(t, root, "")
-
-	cfg := server.MainConfig{Port: "9090", PublicDir: "web/public", PlainHTTP: true}
-	if err := server.RunGenerator(root, cfg); err != nil {
-		t.Fatalf("RunGenerator: %v", err)
+	if err := h.CreateTemplateServer(); err != nil {
+		t.Logf("CreateTemplateServer returned error: %v", err)
 	}
-	want := []string{getToolCall, "tool appkitc -port=9090 -public-dir=web/public -plain-http"}
-	got := rec.Calls()
-	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("go commands: want %q, got %q", want, got)
+	calls := rec.Calls()
+	want := server.MainConfig{Port: "9090", PublicDir: "web/public", PlainHTTP: true}
+	if len(calls) != 1 || calls[0] != want {
+		t.Fatalf("generator calls: want one with %+v, got %+v", want, calls)
 	}
 }
 
-// The tool line is added once: when the app already pins appkitc, only the generator runs and without -plain-http.
-func TestRunGenerator_DoesNotAddTheToolTwice(t *testing.T) {
-	rec := fakeGo(t, "")
-	root := t.TempDir()
-	writeModule(t, root, toolDirective)
+// Without a connected generator the handler fails loudly instead of leaving the app without its main files.
+func TestCreateTemplateServer_FailsWithoutAGenerator(t *testing.T) {
+	tmp := t.TempDir()
+	h := newBareHandler(t, "web/server", "web/server", tmp)
+	writeRoutesFile(t, tmp)
+	close(h.ExitChan)
 
-	if err := server.RunGenerator(root, server.MainConfig{Port: "8080", PublicDir: "web/public"}); err != nil {
-		t.Fatalf("RunGenerator: %v", err)
-	}
-	got := rec.Calls()
-	if len(got) != 1 || got[0] != "tool appkitc -port=8080 -public-dir=web/public" {
-		t.Fatalf("go commands: want only the generator, got %q", got)
-	}
-}
-
-func TestRunGenerator_ReportsAGeneratorFailure(t *testing.T) {
-	fakeGo(t, "tool appkitc")
-	root := t.TempDir()
-	writeModule(t, root, toolDirective)
-
-	err := server.RunGenerator(root, server.MainConfig{Port: "8080"})
-	if !errors.Is(err, server.ErrGeneratorFailed) {
-		t.Fatalf("want ErrGeneratorFailed, got %v", err)
-	}
-}
-
-func TestRunGenerator_ReportsAToolThatCannotBeAdded(t *testing.T) {
-	fakeGo(t, "get -tool")
-	root := t.TempDir()
-	writeModule(t, root, "")
-
-	err := server.RunGenerator(root, server.MainConfig{Port: "8080"})
-	if !errors.Is(err, server.ErrGeneratorNotInstalled) {
-		t.Fatalf("want ErrGeneratorNotInstalled, got %v", err)
-	}
-}
-
-func TestRunGenerator_RefusesAFolderWithoutGoMod(t *testing.T) {
-	fakeGo(t, "")
-	err := server.RunGenerator(t.TempDir(), server.MainConfig{Port: "8080"})
-	if !errors.Is(err, server.ErrGeneratorNotInstalled) {
-		t.Fatalf("want ErrGeneratorNotInstalled, got %v", err)
-	}
-}
-
-func TestUpgradeGenerator_AsksForTheNewestAppkitc(t *testing.T) {
-	rec := fakeGo(t, "")
-	if err := server.UpgradeGenerator(t.TempDir()); err != nil {
-		t.Fatalf("UpgradeGenerator: %v", err)
-	}
-	got := rec.Calls()
-	if len(got) != 1 || got[0] != "get "+server.GeneratorModulePath+"@latest" {
-		t.Fatalf("go commands: want one go get of appkitc, got %q", got)
+	err := h.CreateTemplateServer()
+	if !errors.Is(err, server.ErrNoMainGenerator) {
+		t.Fatalf("want ErrNoMainGenerator, got %v", err)
 	}
 }
 
@@ -157,7 +90,7 @@ func TestHasRoutes(t *testing.T) {
 
 func TestReadModulePath_ReadsTheModuleLine(t *testing.T) {
 	root := t.TempDir()
-	writeModule(t, root, "")
+	writeModule(t, root)
 	if got := server.ReadModulePath(root); got != "example.com/app" {
 		t.Fatalf("ReadModulePath = %q, want example.com/app", got)
 	}

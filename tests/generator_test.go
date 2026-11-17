@@ -9,7 +9,8 @@ import (
 	"webtyp.com/server"
 )
 
-func newTestHandler(t *testing.T, sourceDir, outputDir, appRootDir string) *server.ServerHandler {
+// newBareHandler is a handler with no generator connected.
+func newBareHandler(t *testing.T, sourceDir, outputDir, appRootDir string) *server.ServerHandler {
 	t.Helper()
 	h := server.New()
 	h.SetAppRootDir(appRootDir)
@@ -19,6 +20,14 @@ func newTestHandler(t *testing.T, sourceDir, outputDir, appRootDir string) *serv
 	h.SetHTTPS(false) // these tests probe plain HTTP; TLS is covered in httpd/ and https_test.go
 	h.SetExitChan(make(chan bool, 10))
 	h.SetLogger(safeTestLogger(t))
+	return h
+}
+
+// newTestHandler is a handler that records how it asks for the app's main files instead of writing them.
+func newTestHandler(t *testing.T, sourceDir, outputDir, appRootDir string) *server.ServerHandler {
+	t.Helper()
+	h := newBareHandler(t, sourceDir, outputDir, appRootDir)
+	useRecorder(h)
 	return h
 }
 
@@ -57,25 +66,6 @@ func writeRoutesFile(t *testing.T, root string) {
 	const src = "package config\n\nimport \"webtyp.com/router\"\n\nfunc Register(r router.Router) {}\n"
 	if err := os.WriteFile(filepath.Join(dir, "routes.go"), []byte(src), 0o644); err != nil {
 		t.Fatalf("writing routes.go: %v", err)
-	}
-}
-
-func TestCreateTemplateServer_RunsTheGenerator(t *testing.T) {
-	rec := fakeGo(t, "")
-	tmp := t.TempDir()
-	h := newTestHandler(t, "web/server", "web/server", tmp)
-	writeModule(t, tmp, toolDirective)
-	writeRoutesFile(t, tmp)
-
-	close(h.ExitChan)
-
-	if err := h.CreateTemplateServer(); err != nil {
-		t.Logf("CreateTemplateServer returned error: %v", err)
-	}
-
-	const want = "tool appkitc -port=9090 -public-dir=web/public -plain-http"
-	if !hasCall(rec.Calls(), want) {
-		t.Fatalf("expected the generator to run as %q, go commands: %q", want, rec.Calls())
 	}
 }
 

@@ -45,6 +45,7 @@ func setUnexportedField(h *server.ServerHandler, fieldName string, value interfa
 // External mode must invoke BeforeExternalServerStart BEFORE strategy.Start.
 func TestStartServer_BeforeHookRunsBeforeStrategy(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	setUnexportedField(h, "executionInternal", false)
 	mock := &mockStrategy{}
 	setUnexportedField(h, "strategy", server.ServerStrategy(mock))
@@ -105,6 +106,7 @@ func TestStartServer_BeforeHookErrorAborts(t *testing.T) {
 // Internal mode must NOT invoke BeforeExternalServerStart.
 func TestStartServer_InternalModeSkipsBeforeHook(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(t.TempDir())
 	h.SetExitChan(make(chan bool, 1))
 	h.ExitChan <- true // Allow Start to return immediately
@@ -130,6 +132,7 @@ func TestStartServer_InternalModeSkipsBeforeHook(t *testing.T) {
 // RestartServer must bypass the hook by design.
 func TestRestartServer_DoesNotInvokeHook(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	setUnexportedField(h, "executionInternal", false)
 	mock := &mockStrategy{}
 	setUnexportedField(h, "strategy", server.ServerStrategy(mock))
@@ -160,6 +163,7 @@ func TestRestartServer_DoesNotInvokeHook(t *testing.T) {
 // Test idempotency: hook fires on every StartServer call in external mode.
 func TestStartServer_HookIsIdempotent(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	setUnexportedField(h, "executionInternal", false)
 	mock := &mockStrategy{}
 	setUnexportedField(h, "strategy", server.ServerStrategy(mock))
@@ -182,10 +186,9 @@ func TestStartServer_HookIsIdempotent(t *testing.T) {
 func TestCreateTemplateServer_InvokesBeforeHook(t *testing.T) {
 	// Use a temporary directory for AppRootDir to avoid side effects
 	tmpDir := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, tmpDir, toolDirective)
 
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpDir)
 
 	// Inject a mock strategy that records its start time.
@@ -228,9 +231,8 @@ func TestCreateTemplateServer_InvokesBeforeHook(t *testing.T) {
 // CreateTemplateServer must propagate hook errors and NOT start the strategy.
 func TestCreateTemplateServer_HookErrorAbortsStart(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	dir := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, dir, toolDirective)
 	h.SetAppRootDir(dir)
 
 	hookErr := errors.New("boom")

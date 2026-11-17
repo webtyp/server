@@ -7,9 +7,10 @@
 | [TestConcurrentRouteRegistration](../httpd/concurrency_test.go) | ConcurrentRouteRegistration |
 | [TestCreateTemplateServerLoggerMayReadValue](../tests/log_reentrancy_test.go) | CreateTemplateServerLoggerMayReadValue |
 | [TestCreateTemplateServerRunsTheGenerator](../tests/startserver_blackbox_test.go) | CreateTemplateServerRunsTheGenerator |
+| [TestCreateTemplateServer_AsksTheConnectedGenerator](../tests/generator_run_test.go) | CreateTemplateServer_AsksTheConnectedGenerator |
+| [TestCreateTemplateServer_FailsWithoutAGenerator](../tests/generator_run_test.go) | CreateTemplateServer_FailsWithoutAGenerator |
 | [TestCreateTemplateServer_HookErrorAbortsStart](../tests/before_external_hook_test.go) | CreateTemplateServer_HookErrorAbortsStart |
 | [TestCreateTemplateServer_InvokesBeforeHook](../tests/before_external_hook_test.go) | CreateTemplateServer_InvokesBeforeHook |
-| [TestCreateTemplateServer_RunsTheGenerator](../tests/generator_test.go) | CreateTemplateServer_RunsTheGenerator |
 | [TestDNS01_ExclusiveWithOtherModes](../httpd/dns01_test.go) | DNS01_ExclusiveWithOtherModes |
 | [TestDNS01_FailedRenewKeepsServing](../httpd/dns01_test.go) | DNS01_FailedRenewKeepsServing |
 | [TestDNS01_ObtainsWhenNoneStored](../httpd/dns01_test.go) | DNS01_ObtainsWhenNoneStored |
@@ -120,11 +121,6 @@
 | [TestRoutesEndpointReportsRoles](../httpd/routes_endpoint_test.go) | RoutesEndpointReportsRoles |
 | [TestRoutesEndpointReportsUnheldPermission](../httpd/routes_endpoint_test.go) | RoutesEndpointReportsUnheldPermission |
 | [TestRoutesEndpointWithoutPolicy](../httpd/routes_endpoint_test.go) | RoutesEndpointWithoutPolicy |
-| [TestRunGenerator_AddsTheToolThenRunsIt](../tests/generator_run_test.go) | RunGenerator_AddsTheToolThenRunsIt |
-| [TestRunGenerator_DoesNotAddTheToolTwice](../tests/generator_run_test.go) | RunGenerator_DoesNotAddTheToolTwice |
-| [TestRunGenerator_RefusesAFolderWithoutGoMod](../tests/generator_run_test.go) | RunGenerator_RefusesAFolderWithoutGoMod |
-| [TestRunGenerator_ReportsAGeneratorFailure](../tests/generator_run_test.go) | RunGenerator_ReportsAGeneratorFailure |
-| [TestRunGenerator_ReportsAToolThatCannotBeAdded](../tests/generator_run_test.go) | RunGenerator_ReportsAToolThatCannotBeAdded |
 | [TestSecurityClosedByDefault](../httpd/security_test.go) | SecurityClosedByDefault |
 | [TestSecurityContract_Authenticated](../httpd/security_contract_test.go) | SecurityContract_Authenticated |
 | [TestSecurityContract_Contradictions](../httpd/security_contract_test.go) | SecurityContract_Contradictions |
@@ -161,7 +157,6 @@
 | [TestStreamRequiresMFA](../tests/assurance_test.go) | StreamRequiresMFA |
 | [TestStream_GzipBypassedForEventStream](../httpd/adapter_test.go) | Stream_GzipBypassedForEventStream |
 | [TestTLS_CertFileKeyFile_Serves](../httpd/tls_test.go) | TLS_CertFileKeyFile_Serves |
-| [TestUpgradeGenerator_AsksForTheNewestAppkitc](../tests/generator_run_test.go) | UpgradeGenerator_AsksForTheNewestAppkitc |
 | [TestValidateTLS_AutoCertRequiresDomain](../httpd/tls_test.go) | ValidateTLS_AutoCertRequiresDomain |
 | [TestValidateTLS_CertKeyMustBePaired](../httpd/tls_test.go) | ValidateTLS_CertKeyMustBePaired |
 | [TestValidateTLS_PlainHTTPWithAutoCertRejected](../httpd/tls_test.go) | ValidateTLS_PlainHTTPWithAutoCertRejected |

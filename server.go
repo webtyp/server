@@ -61,7 +61,8 @@ func (noopUI) RefreshUI() {}
 
 type ServerHandler struct {
 	*Config
-	mainFileExternalServer string // eg: main.server.go
+	mainFileExternalServer string        // eg: main.server.go
+	mainGenerator          MainGenerator // writes the app's generated main files; connected by the program that starts the handler
 	strategy               ServerStrategy
 	strategyMu             sync.RWMutex // protects strategy and executionInternal only — never call onLog or a strategy method while holding it
 	portMu                 sync.RWMutex // protects AppPort (read from goroutines started by strategies)

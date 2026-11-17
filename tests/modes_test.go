@@ -25,12 +25,11 @@ func isExternal(val string) bool {
 
 func TestServerHandler_Value(t *testing.T) {
 	tmpData := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("src")
 	h.SetExitChan(exitChan)
@@ -49,6 +48,7 @@ func TestServerHandler_Value(t *testing.T) {
 
 func TestServerHandler_Options(t *testing.T) {
 	h := server.New()
+	useRecorder(h)
 	opts := h.Options()
 	if len(opts) != 2 {
 		t.Fatalf("expected 2 options, got %d", len(opts))
@@ -77,13 +77,12 @@ func TestServerHandler_Change(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh handler for each subtest to avoid race conditions
 			tmpData := t.TempDir()
-			fakeGo(t, "")
-			writeModule(t, tmpData, toolDirective)
 			exitChan := make(chan bool, 1)
 			exitChan <- true
 
 			db := &mockStore{data: make(map[string]string)}
 			h := server.New()
+			useRecorder(h)
 			h.SetAppRootDir(tmpData)
 			h.SetSourceDir("src")
 			h.SetExitChan(exitChan)
@@ -101,13 +100,12 @@ func TestServerHandler_Change(t *testing.T) {
 }
 
 func TestSetExternalServerMode_SwitchesToExternal(t *testing.T) {
-	rec := fakeGo(t, "")
 	tmpData := t.TempDir()
-	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
 	h := server.New()
+	rec := useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("src")
 	h.SetOutputDir("bin")
@@ -126,19 +124,18 @@ func TestSetExternalServerMode_SwitchesToExternal(t *testing.T) {
 	}
 
 	// Verify the generator was asked to write the server file
-	if !hasCall(rec.Calls(), "tool appkitc") {
-		t.Fatalf("expected the generator to run, go commands: %q", rec.Calls())
+	if len(rec.Calls()) != 1 {
+		t.Fatalf("expected the generator to be asked once, calls: %+v", rec.Calls())
 	}
 }
 
 func TestSetExternalServerMode_PreventsSwitchingToInternal(t *testing.T) {
 	tmpData := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("src")
 	h.SetExitChan(exitChan)
@@ -163,8 +160,6 @@ func TestSetExternalServerMode_PreventsSwitchingToInternal(t *testing.T) {
 
 func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 	tmpData := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
@@ -178,6 +173,7 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 	}
 
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("web/server")
 	h.SetOutputDir("web/server")
@@ -208,8 +204,6 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 
 func TestModeSwitchWhileRunning_DoesNotHang(t *testing.T) {
 	tmpData := t.TempDir()
-	fakeGo(t, "")
-	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool) // Should be unbuffered to test hang if we wanted, but here we test switching
 
 	var logs []string
@@ -224,6 +218,7 @@ func TestModeSwitchWhileRunning_DoesNotHang(t *testing.T) {
 
 	db := &mockStore{data: make(map[string]string)}
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("src")
 	h.SetOutputDir("bin")
@@ -311,6 +306,7 @@ func TestStartServer_DetectsExistingServerFile(t *testing.T) {
 	exitChan <- true // Prevent blocking on StartServer
 
 	h := server.New()
+	useRecorder(h)
 	h.SetAppRootDir(tmpData)
 	h.SetSourceDir("web/server")
 	h.SetMainInputFile("main.go")

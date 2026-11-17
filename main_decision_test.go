@@ -2,12 +2,8 @@ package server
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"webtyp.com/command"
 )
 
 func mkModule(t *testing.T, root string) {
@@ -83,21 +79,16 @@ func TestServerMainSelection(t *testing.T) {
 		if got, want := h.serverMainRelPath(), filepath.Join(GeneratedMainDir, GeneratedMainFilename); got != want {
 			t.Errorf("serverMainRelPath = %q, want %q", got, want)
 		}
-		var calls []string
-		orig := command.Exec
-		command.Exec = func(name string, args ...string) *exec.Cmd {
-			if name == "go" {
-				calls = append(calls, strings.Join(args, " "))
-				return exec.Command("true")
-			}
-			return orig(name, args...)
-		}
-		t.Cleanup(func() { command.Exec = orig })
+		var asked []MainConfig
+		h.SetMainGenerator(func(rootDir string, cfg MainConfig) error {
+			asked = append(asked, cfg)
+			return nil
+		})
 		if err := h.ensureServerMain(false); err != nil {
 			t.Fatalf("ensureServerMain: %v", err)
 		}
-		if len(calls) != 2 || !strings.HasPrefix(calls[0], "get -tool "+GeneratorToolPath) || !strings.HasPrefix(calls[1], "tool "+GeneratorToolName) {
-			t.Errorf("want the generator added and run, go commands: %q", calls)
+		if len(asked) != 1 {
+			t.Errorf("want the connected generator asked once, got %+v", asked)
 		}
 	})
 
