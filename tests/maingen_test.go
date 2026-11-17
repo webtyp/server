@@ -273,8 +273,14 @@ var App = appkit.App{
 
 	// 1. web/server/main.go
 	src, _ := os.ReadFile(got)
-	if !strings.Contains(string(src), "appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...)") {
-		t.Errorf("server main must call appkit.Server with config.Schema and devtools.Server(config.Schema):\n%s", src)
+	for _, want := range []string{
+		"appkit.Build(config.App, config.Backend, config.Server, env.Get(envDatabase), config.Schema)",
+		"Authn: built.Authn, Authorize: built.Authorize, Policy: built.Policy",
+		"built.Mount(srv.Router(), devtools.Server(config.Schema)...)",
+	} {
+		if !strings.Contains(string(src), want) {
+			t.Errorf("server main must contain %q (it creates the HTTP server between Build and Mount):\n%s", want, src)
+		}
 	}
 
 	// 2. migrate/main.go
@@ -282,8 +288,8 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("migrate/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(mig), "migrate.App(config.App.Server.Database, log.Println, config.Schema)") ||
-		!strings.Contains(string(mig), "migrate.Drop(config.App.Server.Database, config.Schema, *drop)") ||
+	if !strings.Contains(string(mig), "migrate.App(config.Server.Database, log.Println, config.Schema)") ||
+		!strings.Contains(string(mig), "migrate.Drop(config.Server.Database, config.Schema, *drop)") ||
 		!strings.Contains(string(mig), "flag.Bool(migrate.FlagPlan,") {
 		t.Errorf("migrate main must call migrate.App:\n%s", mig)
 	}
@@ -293,8 +299,8 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("web/browser/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "layoutapp.Browser(config.App, devtools.Menu())") {
-		t.Errorf("web/browser/main.go must contain //go:build wasm and layoutapp.Browser(config.App, devtools.Menu()):\n%s", browserMain)
+	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu()))") {
+		t.Errorf("web/browser/main.go must contain //go:build wasm and appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu())):\n%s", browserMain)
 	}
 
 	// 4. config/migrations.go
@@ -555,5 +561,50 @@ func TestMainGen_UpgradesLibrariesWhenOutputChanges(t *testing.T) {
 	generate()
 	if len(*calls) != 2 || (*calls)[1] != want {
 		t.Fatalf("a generated file changed: want a second %q, got %q", want, *calls)
+	}
+}
+
+// An app that declares App.SignIn gets the sign-in's tables migrated first: appkit builds the sign-in itself, so the
+// app lists no module for it and nothing else would create its tables.
+func TestMainGen_SignInMigratesAccessFirst(t *testing.T) {
+	fakeGo(t)
+	root := t.TempDir()
+	writeModule(t, root, "example.com/app")
+	if err := os.MkdirAll(filepath.Join(root, "mod1", "migrate"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "mod1", "migrate", "migrate.go"), []byte("package migrate\n\nfunc Migrate() error { return nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appSrc := `package config
+
+import (
+	"webtyp.com/appkit"
+
+	mod1 "example.com/app/mod1/module"
+)
+
+var App = appkit.App{
+	SignIn:  appkit.SignInByTrustedIP,
+	Modules: []appkit.Module{mod1.Module},
+}
+`
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.GenerateMain(root, "example.com/app", server.MainConfig{Port: "8080", PublicDir: "web/public"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "config", "migrations.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	access, mod1 := strings.Index(got, `{Name: "access", Run: accessmigrate.Migrate}`), strings.Index(got, `{Name: "mod1"`)
+	if access == -1 || mod1 == -1 || access > mod1 {
+		t.Fatalf("access must be migrated before the app's modules:\n%s", got)
 	}
 }

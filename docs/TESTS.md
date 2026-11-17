@@ -43,6 +43,7 @@
 | [TestGenerateCreatesFile](../tests/generator_test.go) | GenerateCreatesFile |
 | [TestGenerateDoesNotOverwriteExistingServerFile](../tests/generator_test.go) | GenerateDoesNotOverwriteExistingServerFile |
 | [TestGenerateMain_App](../tests/maingen_test.go) | GenerateMain_App |
+| [TestMainGen_SignInMigratesAccessFirst](../tests/maingen_test.go) | Una app con `SignIn` migra `access` antes que sus módulos |
 | [TestGenerateMain_HandWrittenNotTouched](../tests/maingen_test.go) | GenerateMain_HandWrittenNotTouched |
 | [TestGenerateMain_Idempotent](../tests/maingen_test.go) | GenerateMain_Idempotent |
 | [TestGenerateMain_OldHeaderRewritten](../tests/maingen_test.go) | GenerateMain_OldHeaderRewritten |
