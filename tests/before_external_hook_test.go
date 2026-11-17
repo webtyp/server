@@ -182,6 +182,8 @@ func TestStartServer_HookIsIdempotent(t *testing.T) {
 func TestCreateTemplateServer_InvokesBeforeHook(t *testing.T) {
 	// Use a temporary directory for AppRootDir to avoid side effects
 	tmpDir := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, tmpDir, toolDirective)
 
 	h := server.New()
 	h.SetAppRootDir(tmpDir)
@@ -226,7 +228,10 @@ func TestCreateTemplateServer_InvokesBeforeHook(t *testing.T) {
 // CreateTemplateServer must propagate hook errors and NOT start the strategy.
 func TestCreateTemplateServer_HookErrorAbortsStart(t *testing.T) {
 	h := server.New()
-	h.SetAppRootDir(t.TempDir())
+	dir := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, dir, toolDirective)
+	h.SetAppRootDir(dir)
 
 	hookErr := errors.New("boom")
 	h.SetBeforeExternalServerStart(func() error {

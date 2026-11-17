@@ -3,7 +3,6 @@ package server_test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
@@ -61,17 +60,12 @@ func writeRoutesFile(t *testing.T, root string) {
 	}
 }
 
-func TestGenerateCreatesFile(t *testing.T) {
+func TestCreateTemplateServer_RunsTheGenerator(t *testing.T) {
+	rec := fakeGo(t, "")
 	tmp := t.TempDir()
-	sourceDir := "web/server"
-	outputDir := "web/server"
-	h := newTestHandler(t, sourceDir, outputDir, tmp)
+	h := newTestHandler(t, "web/server", "web/server", tmp)
+	writeModule(t, tmp, toolDirective)
 	writeRoutesFile(t, tmp)
-
-	target := filepath.Join(tmp, server.GeneratedMainDir, server.GeneratedMainFilename)
-	if _, err := os.Stat(target); err == nil {
-		t.Fatalf("expected no existing file at %s", target)
-	}
 
 	close(h.ExitChan)
 
@@ -79,22 +73,9 @@ func TestGenerateCreatesFile(t *testing.T) {
 		t.Logf("CreateTemplateServer returned error: %v", err)
 	}
 
-	b, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatalf("reading generated file: %v", err)
-	}
-	content := string(b)
-	if !strings.Contains(content, "package main") {
-		t.Errorf("generated file missing package main")
-	}
-	if !strings.Contains(content, "9090") {
-		t.Errorf("generated file missing substituted AppPort (9090)")
-	}
-	if !strings.Contains(content, `httpd.New`) {
-		t.Errorf("generated file missing httpd.New")
-	}
-	if !strings.Contains(content, `web/public`) {
-		t.Errorf("generated file missing default public dir (web/public)")
+	const want = "tool appkitc -port=9090 -public-dir=web/public -plain-http"
+	if !hasCall(rec.Calls(), want) {
+		t.Fatalf("expected the generator to run as %q, go commands: %q", want, rec.Calls())
 	}
 }
 

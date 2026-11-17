@@ -25,6 +25,8 @@ func isExternal(val string) bool {
 
 func TestServerHandler_Value(t *testing.T) {
 	tmpData := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
@@ -75,6 +77,8 @@ func TestServerHandler_Change(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh handler for each subtest to avoid race conditions
 			tmpData := t.TempDir()
+			fakeGo(t, "")
+			writeModule(t, tmpData, toolDirective)
 			exitChan := make(chan bool, 1)
 			exitChan <- true
 
@@ -97,7 +101,9 @@ func TestServerHandler_Change(t *testing.T) {
 }
 
 func TestSetExternalServerMode_SwitchesToExternal(t *testing.T) {
+	rec := fakeGo(t, "")
 	tmpData := t.TempDir()
+	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
@@ -119,15 +125,16 @@ func TestSetExternalServerMode_SwitchesToExternal(t *testing.T) {
 		t.Fatal("expected executionInternal to be false (external) after switching to external")
 	}
 
-	// Verify file was generated
-	targetPath := filepath.Join(tmpData, server.GeneratedMainDir, server.GeneratedMainFilename)
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-		t.Fatalf("expected server file to be generated at %s", targetPath)
+	// Verify the generator was asked to write the server file
+	if !hasCall(rec.Calls(), "tool appkitc") {
+		t.Fatalf("expected the generator to run, go commands: %q", rec.Calls())
 	}
 }
 
 func TestSetExternalServerMode_PreventsSwitchingToInternal(t *testing.T) {
 	tmpData := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
@@ -156,6 +163,8 @@ func TestSetExternalServerMode_PreventsSwitchingToInternal(t *testing.T) {
 
 func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 	tmpData := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool, 1)
 	exitChan <- true
 
@@ -199,6 +208,8 @@ func TestGitIgnoreAdd_CalledOnExternalMode(t *testing.T) {
 
 func TestModeSwitchWhileRunning_DoesNotHang(t *testing.T) {
 	tmpData := t.TempDir()
+	fakeGo(t, "")
+	writeModule(t, tmpData, toolDirective)
 	exitChan := make(chan bool) // Should be unbuffered to test hang if we wanted, but here we test switching
 
 	var logs []string

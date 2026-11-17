@@ -2,8 +2,6 @@ package server_test
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -12,13 +10,17 @@ import (
 	"webtyp.com/server"
 )
 
-// This test verifies that calling CreateTemplateServer generates the external server file
-// and switches strategy. We don't necessarily enforce successful compilation in this test env,
-// but we verify file generation.
-func TestCreateTemplateServerGeneratesFile(t *testing.T) {
+// This test verifies that calling CreateTemplateServer runs the code generator (appkitc) for the app
+// and switches strategy. We don't enforce successful compilation in this test env.
+const generatorCall = "tool appkitc -port=0 -public-dir=web/public"
+
+func TestCreateTemplateServerRunsTheGenerator(t *testing.T) {
 	// enabled: run automatically
 
+	rec := fakeGo(t, "")
 	tmp := t.TempDir()
+	writeModule(t, tmp, toolDirective)
+	writeRoutesFile(t, tmp)
 
 	// capture logs into a buffer
 	// capture logs into a buffer
@@ -42,12 +44,6 @@ func TestCreateTemplateServerGeneratesFile(t *testing.T) {
 	h.SetExitChan(exitChan)
 	h.SetDisableGlobalCleanup(true)
 	h.SetLogger(logger)
-
-	// Ensure external file doesn't exist initially
-	target := filepath.Join(h.AppRootDir, server.GeneratedMainDir, server.GeneratedMainFilename)
-	if _, err := os.Stat(target); err == nil {
-		t.Fatalf("expected no external server file at %s", target)
-	}
 
 	// Verify we are in Internal mode
 	if h.Value() == "external" {
@@ -81,7 +77,7 @@ pollLoop:
 		case <-timeout:
 			break pollLoop
 		case <-ticker.C:
-			if _, statErr := os.Stat(target); statErr == nil {
+			if hasCall(rec.Calls(), generatorCall) {
 				fileFound = true
 				break pollLoop
 			}
@@ -89,7 +85,7 @@ pollLoop:
 	}
 
 	if !fileFound {
-		t.Fatalf("expected generated server file at %s, but not found within timeout", target)
+		t.Fatalf("expected the generator to run as %q within the timeout, go commands: %q", generatorCall, rec.Calls())
 	}
 
 	// Signal to exit
@@ -102,11 +98,6 @@ pollLoop:
 
 	if err != nil && t.Failed() {
 		t.Logf("CreateTemplateServer returned error: %v", err)
-	}
-
-	// Now the generated file should exist
-	if _, err := os.Stat(target); err != nil {
-		t.Fatalf("expected generated server file at %s, but not found: %v", target, err)
 	}
 
 	// Verify the logs mention generation

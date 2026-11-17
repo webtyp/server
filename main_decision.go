@@ -67,8 +67,5 @@ func (h *ServerHandler) ensureServerMain(force bool) error {
 		PublicDir: h.PublicDir,
 		PlainHTTP: !h.Https,
 	}
-	if _, err := GenerateMain(h.AppRootDir, readModulePath(h.AppRootDir), cfg); err != nil {
-		return err
-	}
-	return nil
+	return RunGenerator(h.AppRootDir, cfg)
 }
