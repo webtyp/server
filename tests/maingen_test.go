@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"errors"
 	"os/exec"
 
 	"go/parser"
@@ -211,8 +212,24 @@ func TestEscapeHatch_UserMainNotOverwritten(t *testing.T) {
 	}
 }
 
+// writeConfigApp writes config/app.go and creates the config/services and config/screens folders required by maingen.
+func writeConfigApp(t *testing.T, root, appSrc string) {
+	t.Helper()
+	for _, dir := range []string{
+		filepath.Join(root, "config", "services"),
+		filepath.Join(root, "config", "screens"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestGenerateMain_App: a project whose config/ declares `var App` (one
-// appkit.App) gets server main, migrate main, browser main, and config/migrations.go.
+// appkit.App) gets server main, migrate main, browser main, and config/services/migrations.go.
 func TestGenerateMain_App(t *testing.T) {
 	fakeGo(t)
 	root := t.TempDir()
@@ -241,9 +258,6 @@ func TestGenerateMain_App(t *testing.T) {
 	}
 
 	// Create config/app.go
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := `package config
 
 import (
@@ -258,9 +272,7 @@ var App = appkit.App{
 	Modules: []appkit.Module{mod1.Module, mod2.Module, mod3.Module},
 }
 `
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigApp(t, root, appSrc)
 
 	if !server.HasApp(root) || !server.HasRoutes(root) {
 		t.Fatal("a config/ with `var App` is an app with a server")
@@ -274,9 +286,9 @@ var App = appkit.App{
 	// 1. web/server/main.go
 	src, _ := os.ReadFile(got)
 	for _, want := range []string{
-		"appkit.Build(config.App, config.Backend, config.Server, env.Get(envDatabase), config.Schema)",
+		"backend.Build(config.App, services.Backend, services.Server, env.Get(envDatabase), services.Schema)",
 		"Authn: built.Authn, Authorize: built.Authorize, Policy: built.Policy",
-		"built.Mount(srv.Router(), devtools.Server(config.Schema)...)",
+		"built.Mount(srv.Router(), devtools.Server(services.Schema)...)",
 	} {
 		if !strings.Contains(string(src), want) {
 			t.Errorf("server main must contain %q (it creates the HTTP server between Build and Mount):\n%s", want, src)
@@ -288,8 +300,8 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("migrate/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(mig), "migrate.App(config.Server.Database, log.Println, config.Schema)") ||
-		!strings.Contains(string(mig), "migrate.Drop(config.Server.Database, config.Schema, *drop)") ||
+	if !strings.Contains(string(mig), "migrate.App(services.Server.Database, log.Println, services.Schema)") ||
+		!strings.Contains(string(mig), "migrate.Drop(services.Server.Database, services.Schema, *drop)") ||
 		!strings.Contains(string(mig), "flag.Bool(migrate.FlagPlan,") {
 		t.Errorf("migrate main must call migrate.App:\n%s", mig)
 	}
@@ -299,38 +311,35 @@ var App = appkit.App{
 	if err != nil {
 		t.Fatalf("web/browser/main.go not generated: %v", err)
 	}
-	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu()))") {
-		t.Errorf("web/browser/main.go must contain //go:build wasm and appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu())):\n%s", browserMain)
+	if !strings.Contains(string(browserMain), "//go:build wasm") || !strings.Contains(string(browserMain), "browser.Run(config.App, screens.Browser, layoutapp.New(devtools.Menu()))") {
+		t.Errorf("web/browser/main.go must contain //go:build wasm and browser.Run(config.App, screens.Browser, layoutapp.New(devtools.Menu())):\n%s", browserMain)
 	}
 
-	// 4. config/migrations.go
-	migrationsFile, err := os.ReadFile(filepath.Join(root, "config", "migrations.go"))
+	// 4. config/services/migrations.go
+	migrationsFile, err := os.ReadFile(filepath.Join(root, "config", "services", "migrations.go"))
 	if err != nil {
-		t.Fatalf("config/migrations.go not generated: %v", err)
+		t.Fatalf("config/services/migrations.go not generated: %v", err)
 	}
 	migStr := string(migrationsFile)
 	if !strings.Contains(migStr, "//go:build !wasm") {
-		t.Errorf("config/migrations.go missing //go:build !wasm:\n%s", migStr)
+		t.Errorf("config/services/migrations.go missing //go:build !wasm:\n%s", migStr)
 	}
-	if !strings.Contains(migStr, "package config") {
-		t.Errorf("config/migrations.go must be package config:\n%s", migStr)
-	}
-	if !strings.Contains(migStr, "package config") {
-		t.Errorf("config/migrations.go must be package config:\n%s", migStr)
+	if !strings.Contains(migStr, "package services") {
+		t.Errorf("config/services/migrations.go must be package services:\n%s", migStr)
 	}
 	if !strings.Contains(migStr, `{Name: "mod1", Run: mod1migrate.Migrate}`) {
-		t.Errorf("config/migrations.go missing mod1:\n%s", migStr)
+		t.Errorf("config/services/migrations.go missing mod1:\n%s", migStr)
 	}
 	if strings.Contains(migStr, "mod2") {
-		t.Errorf("config/migrations.go unexpectedly contains mod2 (which has no migrate package):\n%s", migStr)
+		t.Errorf("config/services/migrations.go unexpectedly contains mod2 (which has no migrate package):\n%s", migStr)
 	}
 	if !strings.Contains(migStr, `{Name: "mod3", Run: mod3migrate.Migrate}`) {
-		t.Errorf("config/migrations.go missing mod3:\n%s", migStr)
+		t.Errorf("config/services/migrations.go missing mod3:\n%s", migStr)
 	}
 	idx1 := strings.Index(migStr, `{Name: "mod1"`)
 	idx3 := strings.Index(migStr, `{Name: "mod3"`)
 	if idx1 == -1 || idx3 == -1 || idx1 >= idx3 {
-		t.Errorf("expected mod1 before mod3 in config/migrations.go:\n%s", migStr)
+		t.Errorf("expected mod1 before mod3 in config/services/migrations.go:\n%s", migStr)
 	}
 	if _, err := os.Stat(filepath.Join(root, server.GeneratedMigrateDir, "migrations.go")); !os.IsNotExist(err) {
 		t.Errorf("migrate/migrations.go must NOT exist")
@@ -345,7 +354,7 @@ var App = appkit.App{
 		{"web/server/main.go", string(src), "the server binary of this app; dev tools (database diagram, API explorer) come from webtyp.com/devtools and exist only with -tags dev."},
 		{"web/browser/main.go", string(browserMain), "the browser (wasm) binary of this app; the «Developer tools» menu comes from webtyp.com/devtools and exists only with -tags dev; the chassis (webtyp.com/layout) is chosen here, by the app, and by no module."},
 		{"migrate/main.go", string(mig), "the migration binary: webtyp dev runs it on start and when a model or go.mod changes; the self-host supervisor runs it before each new version (webtyp.com/migrate)."},
-		{"config/migrations.go", migStr, "the migrations of App.Modules in the same order, read by migrate/main.go and by the dev database diagram; build tag !wasm keeps it out of the browser."},
+		{"config/services/migrations.go", migStr, "the migrations of App.Modules in the same order, read by migrate/main.go and by the dev database diagram; build tag !wasm keeps it out of the browser."},
 	}
 	for _, f := range files {
 		if !strings.HasPrefix(f.content, "// Code generated by webtyp.com/server (maingen.go)") {
@@ -370,16 +379,11 @@ func TestGenerateMain_OldHeaderRewritten(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.24\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := `package config
 import "webtyp.com/appkit"
 var App = appkit.App{}
 `
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigApp(t, root, appSrc)
 
 	// Pre-create files with old header
 	oldHeader := "// Code generated by https://webtyp.com. DO NOT EDIT.\npackage main\nold content\n"
@@ -395,7 +399,7 @@ var App = appkit.App{}
 	_ = os.MkdirAll(migrateDir, 0o755)
 	_ = os.WriteFile(filepath.Join(migrateDir, "main.go"), []byte(oldHeader), 0o644)
 
-	_ = os.WriteFile(filepath.Join(root, "config", "migrations.go"), []byte(oldHeader), 0o644)
+	_ = os.WriteFile(filepath.Join(root, "config", "services", "migrations.go"), []byte(oldHeader), 0o644)
 
 	got, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"})
 	if err != nil {
@@ -419,7 +423,7 @@ var App = appkit.App{}
 	checkRewritten(got, "web/server/main.go")
 	checkRewritten(filepath.Join(browserDir, "main.go"), "web/browser/main.go")
 	checkRewritten(filepath.Join(migrateDir, "main.go"), "migrate/main.go")
-	checkRewritten(filepath.Join(root, "config", "migrations.go"), "config/migrations.go")
+	checkRewritten(filepath.Join(root, "config", "services", "migrations.go"), "config/services/migrations.go")
 }
 
 func TestGenerateMain_HandWrittenNotTouched(t *testing.T) {
@@ -429,16 +433,11 @@ func TestGenerateMain_HandWrittenNotTouched(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.24\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := `package config
 import "webtyp.com/appkit"
 var App = appkit.App{}
 `
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigApp(t, root, appSrc)
 
 	handWrittenServer := "// Hand-written custom server\npackage main\nfunc main() {}\n"
 	serverDir := filepath.Join(root, "web", "server")
@@ -468,31 +467,26 @@ var App = appkit.App{}
 	}
 }
 
-// TestMainGen_RemovedWrittenOnce: an app gets config/removed.go with an empty list, and a later
+// TestMainGen_RemovedWrittenOnce: an app gets config/services/removed.go with an empty list, and a later
 // generation never overwrites what webtyp dev wrote there.
 func TestMainGen_RemovedWrittenOnce(t *testing.T) {
 	fakeGo(t)
 	root := t.TempDir()
 	const modulePath = "example.com/app"
 	writeModule(t, root, modulePath)
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	removed := filepath.Join(root, "config", server.GeneratedRemovedFile)
+	writeConfigApp(t, root, appSrc)
+	removed := filepath.Join(root, "config", "services", server.GeneratedRemovedFile)
 
 	if _, err := server.GenerateMain(root, modulePath, server.MainConfig{Port: "8080"}); err != nil {
 		t.Fatal(err)
 	}
 	first, err := os.ReadFile(removed)
 	if err != nil {
-		t.Fatalf("config/removed.go not generated: %v", err)
+		t.Fatalf("config/services/removed.go not generated: %v", err)
 	}
 	if !strings.Contains(string(first), "var Removed = []ddl.Removed{}") || !server.IsGenerated(string(first)) {
-		t.Fatalf("config/removed.go must hold an empty generated list:\n%s", first)
+		t.Fatalf("config/services/removed.go must hold an empty generated list:\n%s", first)
 	}
 
 	answered := strings.Replace(string(first), "[]ddl.Removed{}", `[]ddl.Removed{{Table: "holiday", Column: "label", MovedTo: "name"}}`, 1)
@@ -503,7 +497,7 @@ func TestMainGen_RemovedWrittenOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, _ := os.ReadFile(removed); string(got) != answered {
-		t.Fatalf("a second generation overwrote config/removed.go:\n%s", got)
+		t.Fatalf("a second generation overwrote config/services/removed.go:\n%s", got)
 	}
 }
 
@@ -530,13 +524,8 @@ func TestMainGen_UpgradesLibrariesWhenOutputChanges(t *testing.T) {
 	root := t.TempDir()
 	const modulePath = "example.com/app"
 	writeModule(t, root, modulePath)
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigApp(t, root, appSrc)
 	const want = "get webtyp.com/appkit@latest webtyp.com/ddl@latest webtyp.com/devtools@latest webtyp.com/layout@latest webtyp.com/migrate@latest"
 	generate := func() {
 		t.Helper()
@@ -576,9 +565,6 @@ func TestMainGen_SignInMigratesAccessFirst(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "mod1", "migrate", "migrate.go"), []byte("package migrate\n\nfunc Migrate() error { return nil }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	appSrc := `package config
 
 import (
@@ -592,13 +578,11 @@ var App = appkit.App{
 	Modules: []appkit.Module{mod1.Module},
 }
 `
-	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigApp(t, root, appSrc)
 	if _, err := server.GenerateMain(root, "example.com/app", server.MainConfig{Port: "8080", PublicDir: "web/public"}); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "config", "migrations.go"))
+	data, err := os.ReadFile(filepath.Join(root, "config", "services", "migrations.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,5 +590,77 @@ var App = appkit.App{
 	access, mod1 := strings.Index(got, `{Name: "access", Run: accessmigrate.Migrate}`), strings.Index(got, `{Name: "mod1"`)
 	if access == -1 || mod1 == -1 || access > mod1 {
 		t.Fatalf("access must be migrated before the app's modules:\n%s", got)
+	}
+}
+
+func TestMaingen_RefusesAppWithoutServicesPackage(t *testing.T) {
+	fakeGo(t)
+	root := t.TempDir()
+	writeModule(t, root, "example.com/app")
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
+	if err := os.WriteFile(filepath.Join(root, "config", "app.go"), []byte(appSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := server.GenerateMain(root, "example.com/app", server.MainConfig{Port: "8080"})
+	if !errors.Is(err, server.ErrNoServicesPackage) {
+		t.Fatalf("want ErrNoServicesPackage, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "web", "browser", "main.go")); !os.IsNotExist(statErr) {
+		t.Fatalf("web/browser/main.go must not be written on error")
+	}
+}
+
+func TestMaingen_MovesRemovedFileToServices(t *testing.T) {
+	fakeGo(t)
+	root := t.TempDir()
+	writeModule(t, root, "example.com/app")
+	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
+	writeConfigApp(t, root, appSrc)
+	oldRemoved := "package config\n\nimport \"webtyp.com/ddl\"\n\nvar Removed = []ddl.Removed{{Table: \"t\", Column: \"c\"}}\n"
+	if err := os.WriteFile(filepath.Join(root, "config", server.GeneratedRemovedFile), []byte(oldRemoved), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := server.GenerateMain(root, "example.com/app", server.MainConfig{Port: "8080"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "config", server.GeneratedRemovedFile)); !os.IsNotExist(err) {
+		t.Fatalf("config/removed.go must be deleted after moving")
+	}
+	got, err := os.ReadFile(filepath.Join(root, "config", "services", server.GeneratedRemovedFile))
+	if err != nil {
+		t.Fatalf("config/services/removed.go missing: %v", err)
+	}
+	if !strings.Contains(string(got), "package services") || !strings.Contains(string(got), `Table: "t"`) {
+		t.Fatalf("unexpected config/services/removed.go:\n%s", got)
+	}
+}
+
+func TestMaingen_DeletesOldMigrationsFile(t *testing.T) {
+	fakeGo(t)
+	root := t.TempDir()
+	writeModule(t, root, "example.com/app")
+	appSrc := "package config\n\nimport \"webtyp.com/appkit\"\n\nvar App = appkit.App{}\n"
+	writeConfigApp(t, root, appSrc)
+	if err := os.WriteFile(filepath.Join(root, "config", "migrations.go"), []byte("package config\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := server.GenerateMain(root, "example.com/app", server.MainConfig{Port: "8080"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "config", "migrations.go")); !os.IsNotExist(err) {
+		t.Fatalf("old config/migrations.go must be deleted")
+	}
+	got, err := os.ReadFile(filepath.Join(root, "config", "services", "migrations.go"))
+	if err != nil {
+		t.Fatalf("config/services/migrations.go missing: %v", err)
+	}
+	if !strings.Contains(string(got), "package services") {
+		t.Fatalf("config/services/migrations.go must be package services:\n%s", got)
 	}
 }

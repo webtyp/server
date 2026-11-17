@@ -100,6 +100,9 @@
 | [TestLocalTLS_ServesWithoutBlockingOnTruststoreFailure](../httpd/tls_test.go) | LocalTLS_ServesWithoutBlockingOnTruststoreFailure |
 | [TestMainGen_RemovedWrittenOnce](../tests/maingen_test.go) | MainGen_RemovedWrittenOnce |
 | [TestMainGen_UpgradesLibrariesWhenOutputChanges](../tests/maingen_test.go) | MainGen_UpgradesLibrariesWhenOutputChanges |
+| [TestMaingen_DeletesOldMigrationsFile](../tests/maingen_test.go) | Maingen_DeletesOldMigrationsFile |
+| [TestMaingen_MovesRemovedFileToServices](../tests/maingen_test.go) | Maingen_MovesRemovedFileToServices |
+| [TestMaingen_RefusesAppWithoutServicesPackage](../tests/maingen_test.go) | Maingen_RefusesAppWithoutServicesPackage |
 | [TestModeSwitchWhileRunning_DoesNotHang](../tests/modes_test.go) | ModeSwitchWhileRunning_DoesNotHang |
 | [TestModoExternoLoDecideElArchivo](../tests/mode_file_decision_test.go) | ModoExternoLoDecideElArchivo |
 | [TestModoInternoSinArchivo](../tests/mode_file_decision_test.go) | ModoInternoSinArchivo |
