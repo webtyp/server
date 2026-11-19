@@ -63,7 +63,13 @@ func (c *httpContext) Body() []byte {
 	return c.body
 }
 
+// GetHeader reads a request header. Host is answered from r.Host: net/http
+// moves it out of r.Header, so without this a handler could not tell
+// user2.localhost from localhost.
 func (c *httpContext) GetHeader(key string) string {
+	if strings.EqualFold(key, "Host") {
+		return c.r.Host
+	}
 	return c.r.Header.Get(key)
 }
 
