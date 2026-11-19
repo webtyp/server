@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -351,8 +350,4 @@ func TestLocalTLS_ServesWithoutBlockingOnTruststoreFailure(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
-}
-
-func _unusedImportsCheck() {
-	_ = io.EOF
 }

@@ -6,14 +6,15 @@ require (
 	github.com/go-acme/lego/v4 v4.35.2
 	github.com/smallstep/truststore v0.13.0
 	golang.org/x/crypto v0.53.0
-	webtyp.com/command v0.0.4
+	webtyp.com/events v0.1.15
 	webtyp.com/gobuild v0.0.28
 	webtyp.com/gorun v0.0.29
 	webtyp.com/json v0.5.40
 	webtyp.com/lang v0.1.16
-	webtyp.com/model v0.2.23
+	webtyp.com/model v0.2.26
 	webtyp.com/pwa v0.2.13
-	webtyp.com/router v0.5.0
+	webtyp.com/router v0.5.7
+	webtyp.com/securityevent v0.0.2
 )
 
 require (
@@ -27,6 +28,9 @@ require (
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	howett.net/plist v1.0.0 // indirect
+	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/escape v0.1.0 // indirect
-	webtyp.com/fmt v1.0.2 // indirect
+	webtyp.com/fmt v1.0.3 // indirect
+	webtyp.com/msgtype v0.1.2 // indirect
+	webtyp.com/time v0.6.7 // indirect
 )

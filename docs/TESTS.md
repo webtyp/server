@@ -164,3 +164,4 @@
 | [TestWaitForPortListening_HTTPS](../tests/https_test.go) | WaitForPortListening_HTTPS |
 | [TestWaitForPortListening_HTTP](../tests/https_test.go) | WaitForPortListening_HTTP |
 | [TestZeroTLSConfig_ServesHTTPSWithLocalCA](../httpd/tls_test.go) | ZeroTLSConfig_ServesHTTPSWithLocalCA |
+| [TestGate_ReportsASignedInPersonRefused](../httpd/report_denied_test.go) | a signed-in person refused by a permission is reported as authz_fail with who and the resource; an anonymous caller refused the same way is not |

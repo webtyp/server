@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"webtyp.com/securityevent"
 
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -26,6 +27,7 @@ type Config struct {
 
 	Authn          router.Middleware
 	Authorize      model.Authorizer
+	Report         securityevent.Reporter // where the gate reports a signed-in person refused by a permission (authz_fail); appkit passes the app's
 	RoutesEndpoint bool
 
 	// Policy lets the introspection endpoint report WHICH roles hold the
@@ -145,7 +147,7 @@ func (s *Server) base() (http.Handler, error) {
 	}
 
 	// Set authorizer for the router to use in closures
-	s.router.setAuthorizer(s.config.Authn, s.config.Authorize)
+	s.router.setAuthorizer(s.config.Authn, s.config.Authorize, s.config.Report, s.config.Logger)
 
 	if err := s.validateTLS(); err != nil {
 		s.baseErr = err

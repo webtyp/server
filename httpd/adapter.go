@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"webtyp.com/securityevent"
 
 	"webtyp.com/json"
 	"webtyp.com/model"
@@ -214,15 +215,16 @@ func (s *httpStreamer) Done() <-chan struct{} {
 }
 
 type httpRouter struct {
-	mux               *http.ServeMux
-	mu                sync.RWMutex
-	middlewares       []router.Middleware
-	globalMiddlewares []router.Middleware
-	routes            []*httpRoute
+	mux         *http.ServeMux
+	mu          sync.RWMutex
+	middlewares []router.Middleware
+	routes      []*httpRoute
 
 	// Authorizer info to be used by enforced RBAC
 	authn      router.Middleware
 	authorizer model.Authorizer
+	report     securityevent.Reporter
+	logger     func(...any)
 }
 
 type httpRoute struct {
@@ -277,17 +279,22 @@ func (r *httpRouter) Use(m ...router.Middleware) {
 	r.middlewares = append(r.middlewares, m...)
 }
 
-func (r *httpRouter) useGlobal(m ...router.Middleware) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.globalMiddlewares = append(r.globalMiddlewares, m...)
-}
-
-func (r *httpRouter) setAuthorizer(authn router.Middleware, authorizer model.Authorizer) {
+func (r *httpRouter) setAuthorizer(authn router.Middleware, authorizer model.Authorizer, report securityevent.Reporter, logger func(...any)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.authn = authn
 	r.authorizer = authorizer
+	r.report = report
+	r.logger = logger
+}
+
+// reportDenied tells the security watch that a signed-in person asked for something their permissions do not allow.
+// A report that cannot be published goes to the log, never nowhere.
+func (r *httpRouter) reportDenied(ctx router.Context, resource model.Resource) {
+	err := r.report.Report(securityevent.Event{Kind: securityevent.AccessDenied, UserID: ctx.UserID(), Resource: string(resource), IP: ctx.Value(router.ContextKeyRemoteAddr)})
+	if err != nil && r.logger != nil {
+		r.logger(err)
+	}
 }
 
 func (r *httpRouter) Handle(method, path string, h router.HandlerFunc) router.Route {
@@ -445,7 +452,6 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 	authn := r.authn
 	authorizer := r.authorizer
 	mws := r.middlewares
-	gmws := r.globalMiddlewares
 
 	wrapped := h
 	if wrapped == nil {
@@ -455,9 +461,6 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 	// 1. The consumer's middleware wraps the handler — BEHIND the gate (step 2). A rejected
 	//    request must execute none of it: a Use that decodes the body or hits the DB would
 	//    otherwise do that work for a caller who is about to get a 403. The gate is a gate.
-	//
-	//    The library's own batteries (log, gzip) are NOT here — they are globalMiddlewares,
-	//    applied in step 3, outside the gate, so a rejection is still logged.
 	for i := 0; i < len(mws); i++ {
 		wrapped = mws[i](wrapped)
 	}
@@ -497,6 +500,7 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 			}
 			// model.Allowed deniega si Authorize es nil: la ausencia de respuesta no es permiso.
 			if !model.Allowed(authorizer, ctx.UserID(), route.info.Resource, route.info.Action) {
+				r.reportDenied(ctx, route.info.Resource)
 				ctx.WriteStatus(http.StatusForbidden)
 				ctx.Write([]byte(bodyForbidden))
 				return
@@ -505,14 +509,7 @@ func (r *httpRouter) applySecurityAndMiddleware(h router.HandlerFunc, route *htt
 		}
 	}
 
-	// 3. The library's batteries (log, gzip, no-cache) sit OUTSIDE the gate on purpose: a
-	//    rejected request must still be logged and compressed. They are the seam for anything
-	//    that legitimately needs to observe a 403.
-	for i := 0; i < len(gmws); i++ {
-		wrapped = gmws[i](wrapped)
-	}
-
-	// 4. Authn is the outermost: identity must exist BEFORE the gate decides with it.
+	// 3. Authn is the outermost: identity must exist BEFORE the gate decides with it.
 	if authn != nil {
 		wrapped = authn(wrapped)
 	}

@@ -18,12 +18,6 @@ import (
 	"time"
 )
 
-// fakeAddr is a net.Addr carrying a fixed CIDR, for stubbing interfaceAddrs.
-type fakeAddr struct{ s string }
-
-func (f fakeAddr) Network() string { return "ip+net" }
-func (f fakeAddr) String() string  { return f.s }
-
 func stubInterfaceAddrs(t *testing.T, cidrs ...string) {
 	t.Helper()
 	prev := interfaceAddrs

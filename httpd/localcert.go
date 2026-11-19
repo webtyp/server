@@ -35,7 +35,7 @@ const (
 	pemTypeCert        = "CERTIFICATE"
 	pemTypeECPrivate   = "EC PRIVATE KEY"
 
-	localCertDirPerm    os.FileMode = 0o755
+	localCertDirPerm     os.FileMode = 0o755
 	localKeyFilePerm     os.FileMode = 0o600
 	localSANsFilePerm    os.FileMode = 0o644
 	localCAValidFor                  = 10 * 365 * 24 * time.Hour
