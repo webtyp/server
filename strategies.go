@@ -419,13 +419,18 @@ func (s *externalStrategy) Start(wg *sync.WaitGroup) error {
 func (s *externalStrategy) startServer() error {
 	e := errors.New("startServer")
 
-	// ALWAYS COMPILE before running
+	// ALWAYS COMPILE before running; collapse compile progress/errors onto one
+	// live line, then clear OperationID before launching so runtime app logs
+	// stay discrete.
+	s.handler.SetLastOperationID(defaultServerOpID)
 	err := s.goCompiler.CompileProgram()
 	if err != nil {
 		// Log the compilation error so it's visible in TUI
 		s.handler.log(err.Error())
+		s.handler.SetLastOperationID("")
 		return errors.Join(e, err)
 	}
+	s.handler.SetLastOperationID("")
 
 	// RUN
 	err = s.goRun.RunProgram()
@@ -454,6 +459,8 @@ func (s *externalStrategy) stopQuiet() error {
 }
 
 func (s *externalStrategy) Restart() error {
+	s.handler.SetLastOperationID(defaultServerOpID)
+	defer s.handler.SetLastOperationID("")
 	s.handler.log(logOpen, "Restarting server...")
 	if err := s.stopQuiet(); err != nil {
 		s.handler.log(logClose, "RestartServer failed:", err)
@@ -474,6 +481,8 @@ func (s *externalStrategy) Restart() error {
 		}
 	}
 
+	// Clear OperationID before launching the app so startup/runtime lines stay discrete.
+	s.handler.SetLastOperationID("")
 	// Run synchronously so callers (and tests) observe the run before Restart returns.
 	if err := s.goRun.RunProgram(); err != nil {
 		s.handler.log(logClose, "RunProgram failed:", err)

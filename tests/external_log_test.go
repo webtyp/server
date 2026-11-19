@@ -58,17 +58,22 @@ func main() {
 
 	// Capture logs AFTER handler creation (simulates TUI calling SetLogger later)
 	var logs []string
+	var compileOpID string
 	var logsMu sync.Mutex
 	h.SetLogger(func(msgs ...any) {
+		opID := h.GetLastOperationID()
 		logsMu.Lock()
 		defer logsMu.Unlock()
 		for _, m := range msgs {
-			// type assertion panic fix
+			var line string
 			if s, ok := m.(string); ok {
-				logs = append(logs, strings.TrimSpace(s))
+				line = strings.TrimSpace(s)
 			} else {
-				// handle non-string messages (e.g. error)
-				logs = append(logs, fmt.Sprint(m))
+				line = fmt.Sprint(m)
+			}
+			logs = append(logs, line)
+			if compileOpID == "" && (strings.Contains(line, "syntax") || strings.Contains(line, "build failed")) {
+				compileOpID = opID
 			}
 		}
 	})
@@ -113,6 +118,9 @@ func main() {
 	// The error should mention something about the syntax error (missing parenthesis)
 	if !strings.Contains(allLogs, "syntax") && !strings.Contains(allLogs, "error") && !strings.Contains(allLogs, "build failed") {
 		t.Errorf("Expected compilation error to be visible in logs, but got:\n%s", allLogs)
+	}
+	if compileOpID == "" {
+		t.Errorf("compile error log must carry an OperationID so TUI collapses build bursts onto one live line")
 	}
 }
 
@@ -164,13 +172,19 @@ func main() {
 
 	// Capture logs AFTER handler creation (simulates TUI calling SetLogger later)
 	var logs []string
+	var runtimeOpID string
 	var logsMu sync.Mutex
 	h.SetLogger(func(msgs ...any) {
+		opID := h.GetLastOperationID()
 		logsMu.Lock()
 		defer logsMu.Unlock()
 		for _, m := range msgs {
 			if s, ok := m.(string); ok {
-				logs = append(logs, strings.TrimSpace(s))
+				trimmed := strings.TrimSpace(s)
+				logs = append(logs, trimmed)
+				if strings.Contains(trimmed, "RUNTIME_ERROR") {
+					runtimeOpID = opID
+				}
 			}
 		}
 	})
@@ -213,5 +227,8 @@ func main() {
 	// The runtime error message should be visible
 	if !strings.Contains(allLogs, "RUNTIME_ERROR") {
 		t.Errorf("Expected runtime error 'RUNTIME_ERROR' to be visible in logs, but got:\n%s", allLogs)
+	}
+	if runtimeOpID != "" {
+		t.Errorf("runtime app log must have empty OperationID so TUI keeps each line discrete, got %q", runtimeOpID)
 	}
 }

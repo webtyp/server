@@ -344,15 +344,12 @@ func (h *ServerHandler) SetExternalServerMode(external bool) error {
 	return nil
 }
 
-// GetLastOperationID returns the stable TUI OperationID so SERVER updates a
-// single live line in place during hot-reload cycles.
+// GetLastOperationID returns the active build/restart TUI OperationID, or ""
+// while the server is running so runtime app output stays discrete in the TUI.
 func (h *ServerHandler) GetLastOperationID() string {
 	h.opMu.RLock()
 	id := h.lastOpID
 	h.opMu.RUnlock()
-	if id == "" {
-		return defaultServerOpID
-	}
 	return id
 }
 
