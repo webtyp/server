@@ -31,7 +31,7 @@ func (w *lazyGzipWriter) decide() {
 	if w.Header().Get("Content-Encoding") != "" {
 		return // the handler already encoded the body: pass it through untouched
 	}
-	if strings.HasPrefix(w.Header().Get("Content-Type"), "text/event-stream") {
+	if strings.HasPrefix(w.Header().Get(router.HeaderContentType), "text/event-stream") {
 		return // SSE must not be gzipped: causes buffering, delays, and HTTP/2 stream errors
 	}
 	w.Header().Set("Content-Encoding", "gzip")

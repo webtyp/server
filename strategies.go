@@ -103,7 +103,7 @@ func (s *internalStrategy) Start(wg *sync.WaitGroup) error {
 			indexPath := filepath.Join(hcfg.PublicDir, "index.html")
 			if _, err := os.Stat(indexPath); err == nil {
 				if content, err := os.ReadFile(indexPath); err == nil {
-					ctx.SetHeader("Content-Type", "text/html; charset=utf-8")
+					ctx.SetHeader(router.HeaderContentType, "text/html; charset=utf-8")
 					h := func(c router.Context) {
 						c.Write(content)
 					}
@@ -114,7 +114,7 @@ func (s *internalStrategy) Start(wg *sync.WaitGroup) error {
 				}
 			}
 
-			ctx.SetHeader("Content-Type", "text/html; charset=utf-8")
+			ctx.SetHeader(router.HeaderContentType, "text/html; charset=utf-8")
 			h := func(c router.Context) {
 				fmt.Fprint(c, DefaultNoRoutesMsg)
 			}

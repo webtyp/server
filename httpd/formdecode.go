@@ -11,7 +11,7 @@ import (
 const contentTypeFormUrlEncoded = "application/x-www-form-urlencoded"
 
 func decodeBody(c *httpContext, into model.Decodable) error {
-	ct := c.GetHeader("Content-Type")
+	ct := c.GetHeader(router.HeaderContentType)
 	if idx := strings.IndexByte(ct, ';'); idx != -1 {
 		ct = ct[:idx]
 	}

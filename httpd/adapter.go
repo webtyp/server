@@ -67,7 +67,7 @@ func (c *httpContext) Body() []byte {
 // moves it out of r.Header, so without this a handler could not tell
 // user2.localhost from localhost.
 func (c *httpContext) GetHeader(key string) string {
-	if strings.EqualFold(key, "Host") {
+	if strings.EqualFold(key, router.HeaderHost) {
 		return c.r.Host
 	}
 	return c.r.Header.Get(key)

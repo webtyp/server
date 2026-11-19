@@ -29,7 +29,7 @@ func serveLocalCA(c router.Context) {
 		c.WriteStatus(http.StatusServiceUnavailable)
 		return
 	}
-	c.SetHeader("Content-Type", CADownloadContentType)
+	c.SetHeader(router.HeaderContentType, CADownloadContentType)
 	c.WriteStatus(http.StatusOK)
 	c.Write(der)
 }
