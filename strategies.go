@@ -446,40 +446,57 @@ func (s *externalStrategy) Stop() error {
 	return nil
 }
 
+func (s *externalStrategy) stopQuiet() error {
+	if s.goRun != nil {
+		return s.goRun.StopProgram()
+	}
+	return nil
+}
+
 func (s *externalStrategy) Restart() error {
-	s.handler.log("Restarting External Server...")
-	err := s.Stop()
-	if err != nil {
-		return err
+	s.handler.log(logOpen, "Restarting server...")
+	if err := s.stopQuiet(); err != nil {
+		s.handler.log(logClose, "RestartServer failed:", err)
+		return alreadyLoggedErr{err: err}
 	}
 	waitForPortFree(s.handler.Port()) // Ensure port is free
 
-	// Compile synchronously to catch compilation errors
+	// Compile synchronously to catch compilation errors (retry once if go mod tidy fixes go.mod/go.sum).
 	if err := s.goCompiler.CompileProgram(); err != nil {
-		return err
+		if s.handler.goModTidier != nil {
+			if ran, _ := s.handler.goModTidier(err.Error()); ran {
+				err = s.goCompiler.CompileProgram()
+			}
+		}
+		if err != nil {
+			s.handler.log(logClose, "RestartServer failed:", err)
+			return alreadyLoggedErr{err: err}
+		}
 	}
 
 	// Run synchronously so callers (and tests) observe the run before Restart returns.
 	if err := s.goRun.RunProgram(); err != nil {
-		s.handler.log("RunProgram failed:", err)
-		return err
+		s.handler.log(logClose, "RunProgram failed:", err)
+		return alreadyLoggedErr{err: err}
 	}
-	s.handler.log("External server restarted successfully")
 
 	go func() {
 		// Block until exit signal received
 		if s.handler.ExitChan != nil {
 			<-s.handler.ExitChan
 		}
-		s.Stop()
+		s.stopQuiet()
 	}()
 
 	// Wait for server to be ready before returning
 	// This prevents race conditions where browser reload triggers before server is up
 	if !WaitForPortListening(s.handler.Port(), 30*time.Second, s.handler.Https) {
-		return errors.New("timeout waiting for external server restart")
+		err := errors.New("timeout waiting for external server restart")
+		s.handler.log(logClose, "RestartServer failed:", err)
+		return alreadyLoggedErr{err: err}
 	}
 
+	s.handler.log(logClose, "Server running on port", s.handler.Port())
 	return nil
 }
 
@@ -493,14 +510,7 @@ func (s *externalStrategy) HandleFileEvent(fileName, extension, filePath, event 
 	}
 
 	if isContentChange {
-		s.handler.log("Go file modified, restarting external server ...")
-		err := s.Restart()
-		if err != nil {
-			s.handler.log("RestartServer failed:", err)
-		} else {
-			s.handler.log("RestartServer succeeded")
-		}
-		return err
+		return s.Restart()
 	}
 	return ErrUnsupportedEvent
 }

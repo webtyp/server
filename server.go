@@ -44,7 +44,19 @@ const (
 
 	execModeInternal = "internal"
 	execModeExternal = "external"
+
+	defaultServerOpID = "server-status"
+	logOpen           = "[..."
+	logClose          = "...]"
 )
+
+// alreadyLoggedErr marks an error already emitted under the SERVER badge so
+// devwatch does not echo the same message under WATCH.
+type alreadyLoggedErr struct{ err error }
+
+func (e alreadyLoggedErr) Error() string       { return e.err.Error() }
+func (e alreadyLoggedErr) Unwrap() error       { return e.err }
+func (e alreadyLoggedErr) AlreadyLogged() bool { return true }
 
 // TestMode is a global flag to indicate the server is running in a test environment.
 // This is used to disable aggressive cleanups and other disruptive behaviors.
@@ -68,6 +80,9 @@ type ServerHandler struct {
 	portMu                 sync.RWMutex // protects AppPort (read from goroutines started by strategies)
 	executionInternal      bool         // true = embedded server (internal), false = external process
 	onLog                  func(message ...any)
+	lastOpID               string
+	opMu                   sync.RWMutex
+	goModTidier            func(buildOutput string) (bool, error)
 
 	// Internal route list
 	routes []func(router.Router)
@@ -327,4 +342,30 @@ func (h *ServerHandler) SetExternalServerMode(external bool) error {
 
 	go s.Start(nil)
 	return nil
+}
+
+// GetLastOperationID returns the stable TUI OperationID so SERVER updates a
+// single live line in place during hot-reload cycles.
+func (h *ServerHandler) GetLastOperationID() string {
+	h.opMu.RLock()
+	id := h.lastOpID
+	h.opMu.RUnlock()
+	if id == "" {
+		return defaultServerOpID
+	}
+	return id
+}
+
+// SetLastOperationID overrides the TUI OperationID for SERVER logs.
+func (h *ServerHandler) SetLastOperationID(id string) {
+	h.opMu.Lock()
+	h.lastOpID = id
+	h.opMu.Unlock()
+}
+
+// SetGoModTidier installs a callback that runs `go mod tidy` when compilation
+// fails due to stale go.mod/go.sum, allowing one automatic retry.
+func (h *ServerHandler) SetGoModTidier(fn func(buildOutput string) (bool, error)) *ServerHandler {
+	h.goModTidier = fn
+	return h
 }

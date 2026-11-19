@@ -7,7 +7,7 @@ require (
 	github.com/smallstep/truststore v0.13.0
 	golang.org/x/crypto v0.53.0
 	webtyp.com/events v0.1.15
-	webtyp.com/gobuild v0.0.28
+	webtyp.com/gobuild v0.0.29
 	webtyp.com/gorun v0.0.29
 	webtyp.com/json v0.5.40
 	webtyp.com/lang v0.1.16
