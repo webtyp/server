@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,6 +105,9 @@ func (s *Server) wrapWithGlobalBatteries(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := func(ctx router.Context) {
 			hctx := ctx.(*httpContext)
+			if len(hctx.body) > 0 {
+				r.Body = io.NopCloser(bytes.NewReader(hctx.body))
+			}
 			handler.ServeHTTP(hctx.w, r)
 		}
 		if s.config.NoCache {
@@ -112,6 +116,7 @@ func (s *Server) wrapWithGlobalBatteries(handler http.Handler) http.Handler {
 		if s.config.Gzip {
 			h = Gzip(h)
 		}
+		h = s.effectiveSecurityPolicy().Middleware()(h)
 		h(&httpContext{w: w, r: r})
 	})
 }

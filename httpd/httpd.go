@@ -8,6 +8,7 @@ import (
 
 	"webtyp.com/model"
 	"webtyp.com/router"
+	"webtyp.com/router/security"
 )
 
 const (
@@ -17,13 +18,14 @@ const (
 )
 
 type Config struct {
-	Port         string
-	InternetPort string // the internet door (e.g. behind Cloudflare Tunnel); "" = no internet door
-	PublicDir    string // "" = no servir estáticos
-	Gzip         bool
-	NoCache      bool
-	Health       bool
-	Logger       func(...any)
+	Port           string
+	InternetPort   string // the internet door (e.g. behind Cloudflare Tunnel); "" = no internet door
+	PublicDir      string // "" = no servir estáticos
+	Gzip           bool
+	NoCache        bool
+	Health         bool
+	Logger         func(...any)
+	SecurityPolicy security.Policy // zero value is the hardened policy; methods only widen directives
 
 	Authn          router.Middleware
 	Authorize      model.Authorizer
@@ -57,6 +59,7 @@ type Server struct {
 	dns01     *dns01Manager
 	dns01Once sync.Once
 	dns01Err  error
+	cspCache  cspHashCache
 }
 
 func applyDefaults(c Config) Config {
@@ -130,6 +133,7 @@ func (s *Server) base() (http.Handler, error) {
 			w.Write([]byte("ok"))
 		})
 	}
+	s.mux.HandleFunc(pattern(router.RouteInfo{Method: http.MethodPost, Path: CSPReportPath}), s.handleCSPReport)
 
 	// Re-register all existing routes in the new mux
 	s.router.mu.RLock()

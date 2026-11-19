@@ -56,6 +56,11 @@
 | [TestHTTPContext_PathAndRawQuery](../httpd/adapter_test.go) | a request POST /api/q?a=1&b=two through the adapter: ctx.Path() is /api/q, ctx.RawQuery() is a=1&b=two; without query RawQuery() is "" |
 | [TestHTTPDBatteries](../httpd/batteries_test.go) | HTTPDBatteries |
 | [TestHTTPDConformance](../httpd/conformance_test.go) | HTTPDConformance |
+| [TestHTTPD_AlwaysEmitsStrictCSP](../httpd/csp_report_test.go) | HTTPD_AlwaysEmitsStrictCSP |
+| [TestHTTPD_CSPReportEndpoint_LegacyFormat](../httpd/csp_report_test.go) | HTTPD_CSPReportEndpoint_LegacyFormat |
+| [TestHTTPD_CSPReportEndpoint_MalformedBody](../httpd/csp_report_test.go) | HTTPD_CSPReportEndpoint_MalformedBody |
+| [TestHTTPD_CSPReportEndpoint_ReportsV1](../httpd/csp_report_test.go) | HTTPD_CSPReportEndpoint_ReportsV1 |
+| [TestHTTPD_LoadsScriptHashesFromCSPJSON](../httpd/csp_report_test.go) | HTTPD_LoadsScriptHashesFromCSPJSON |
 | [TestHTTPRouterComplexScenario](../httpd/adapter_test.go) | HTTPRouterComplexScenario |
 | [TestHTTPRouterHandling](../httpd/adapter_test.go) | HTTPRouterHandling |
 | [TestHTTPRouterMethodRestriction](../httpd/adapter_test.go) | HTTPRouterMethodRestriction |
