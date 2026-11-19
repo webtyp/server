@@ -246,7 +246,11 @@ func (s *internalStrategy) Restart() error {
 
 	// Wait for server to be ready before returning
 	// This prevents race conditions where browser reload is triggered before server is up
-	if !WaitForPortListening(s.handler.Port(), 5*time.Second, s.handler.Https) {
+	restartWait := 5 * time.Second
+	if TestMode {
+		restartWait = 200 * time.Millisecond // tests that only check Restart returns must not wait for a server that never starts
+	}
+	if !WaitForPortListening(s.handler.Port(), restartWait, s.handler.Https) {
 		return errors.New("timeout waiting for internal server restart")
 	}
 	return nil

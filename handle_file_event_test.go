@@ -3,6 +3,8 @@ package server
 import (
 	"errors"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	gobuildmock "webtyp.com/gobuild/mock"
@@ -74,31 +76,20 @@ func TestHandleFileEvent_Fast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Pre-start a fake server listening on h.AppPort so WaitForPortListening succeeds
-			ln, err := net.Listen("tcp", ":0")
-			if err != nil {
-				t.Fatalf("failed to listen: %v", err)
-			}
-			_, port, _ := net.SplitHostPort(ln.Addr().String())
+			// A real HTTP server on h.AppPort so WaitForPortListening succeeds. It reads each request before it
+			// answers: a fake that writes on accept answers before the client asks, and net/http logs it as
+			// "Unsolicited response received on idle HTTP channel".
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) }))
+			defer srv.Close()
+			_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
 			h.SetPort(port)
-			go func() {
-				for {
-					conn, err := ln.Accept()
-					if err != nil {
-						return
-					}
-					conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"))
-					conn.Close()
-				}
-			}()
-			defer ln.Close()
 
 			compiler.CompileCallCount = 0
 			compiler.CompileErr = tt.compileErr
 			runner.RunCallCount = 0
 			runner.StopCallCount = 0
 
-			err = s.HandleFileEvent("main.go", ".go", "web/main.go", tt.event)
+			err := s.HandleFileEvent("main.go", ".go", "web/main.go", tt.event)
 
 			if tt.expectErr != nil {
 				if err == nil || err.Error() != tt.expectErr.Error() {
