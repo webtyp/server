@@ -34,6 +34,12 @@ func (w *lazyGzipWriter) decide() {
 	if strings.HasPrefix(w.Header().Get(router.HeaderContentType), "text/event-stream") {
 		return // SSE must not be gzipped: causes buffering, delays, and HTTP/2 stream errors
 	}
+	// A handler such as http.ServeFile sets Content-Length to the uncompressed file size
+	// before calling WriteHeader. Once we wrap the body in gzip, that byte count is wrong:
+	// an image whose gzip stream is slightly larger than the already-compressed PNG is
+	// truncated by net/http at the uncompressed Content-Length (cropping the bottom of
+	// the image), and a text file whose gzip stream is smaller violates HTTP/2 framing.
+	w.Header().Del("Content-Length")
 	w.Header().Set("Content-Encoding", "gzip")
 	w.gz = gzip.NewWriter(w.ResponseWriter)
 }

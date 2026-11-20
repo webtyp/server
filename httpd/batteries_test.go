@@ -71,13 +71,20 @@ func TestHTTPDBatteries(t *testing.T) {
 		t.Errorf("NoCache failed, got header: %s", w.Header().Get("Cache-Control"))
 	}
 
-	// 3. Test Gzip
-	req = httptest.NewRequest("GET", "/test.txt", nil)
+	// 3. Test Gzip — and verify it strips any pre-set Content-Length (e.g. from http.ServeFile)
+	// so HTTP/2 never sees Content-Length (= uncompressed size) disagree with the compressed body,
+	// nor cuts off a compressible response before lazyGzipWriter.Close() flushes the gzip trailer.
+	largePayload := strings.Repeat("hello world — compressible static file payload\n", 200)
+	os.WriteFile(filepath.Join(publicDir, "large.txt"), []byte(largePayload), 0644)
+	req = httptest.NewRequest("GET", "/large.txt", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Header().Get("Content-Encoding") != "gzip" {
 		t.Errorf("Gzip failed, got header: %s", w.Header().Get("Content-Encoding"))
+	}
+	if cl := w.Header().Get("Content-Length"); cl != "" {
+		t.Errorf("Gzip must delete pre-set Content-Length (got %q for a %d-byte compressed body), or HTTP/2 truncates/aborts the stream", cl, w.Body.Len())
 	}
 
 	// 4. Test RBAC - Allow
