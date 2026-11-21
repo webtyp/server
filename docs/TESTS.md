@@ -29,6 +29,7 @@
 | [TestExternalServerCompilerUsesAppRootDir](../tests/compiler_root_test.go) | ExternalServerCompilerUsesAppRootDir |
 | [TestExternalStrategyLogsAreVisible](../tests/external_log_test.go) | ExternalStrategyLogsAreVisible |
 | [TestExternalStrategyRuntimeErrorLogsAreVisible](../tests/external_log_test.go) | ExternalStrategyRuntimeErrorLogsAreVisible |
+| [TestExternalStrategy_CompileWithTidyRetry](../tidy_retry_test.go) | startServer invokes goModTidier with AppRootDir and retries CompileProgram once when tidy runs |
 | [TestExternalStrategy_RootEnvFileVisibleToHandWrittenMain](../tests/envfile_integration_test.go) | ExternalStrategy_RootEnvFileVisibleToHandWrittenMain |
 | [TestFailFastOnMissingAuthorize](../httpd/security_test.go) | FailFastOnMissingAuthorize |
 | [TestFormDecode_CharsetHandling](../httpd/formdecode_test.go) | FormDecode_CharsetHandling |

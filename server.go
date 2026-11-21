@@ -82,7 +82,7 @@ type ServerHandler struct {
 	onLog                  func(message ...any)
 	lastOpID               string
 	opMu                   sync.RWMutex
-	goModTidier            func(buildOutput string) (bool, error)
+	goModTidier            func(moduleDir, buildOutput string) (bool, error)
 
 	// Internal route list
 	routes []func(router.Router)
@@ -362,7 +362,7 @@ func (h *ServerHandler) SetLastOperationID(id string) {
 
 // SetGoModTidier installs a callback that runs `go mod tidy` when compilation
 // fails due to stale go.mod/go.sum, allowing one automatic retry.
-func (h *ServerHandler) SetGoModTidier(fn func(buildOutput string) (bool, error)) *ServerHandler {
+func (h *ServerHandler) SetGoModTidier(fn func(moduleDir, buildOutput string) (bool, error)) *ServerHandler {
 	h.goModTidier = fn
 	return h
 }

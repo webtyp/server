@@ -416,6 +416,16 @@ func (s *externalStrategy) Start(wg *sync.WaitGroup) error {
 	return nil
 }
 
+func (s *externalStrategy) compileWithTidyRetry() error {
+	err := s.goCompiler.CompileProgram()
+	if err != nil && s.handler.goModTidier != nil {
+		if ran, _ := s.handler.goModTidier(s.handler.AppRootDir, err.Error()); ran {
+			err = s.goCompiler.CompileProgram()
+		}
+	}
+	return err
+}
+
 func (s *externalStrategy) startServer() error {
 	e := errors.New("startServer")
 
@@ -423,7 +433,7 @@ func (s *externalStrategy) startServer() error {
 	// live line, then clear OperationID before launching so runtime app logs
 	// stay discrete.
 	s.handler.SetLastOperationID(defaultServerOpID)
-	err := s.goCompiler.CompileProgram()
+	err := s.compileWithTidyRetry()
 	if err != nil {
 		// Log the compilation error so it's visible in TUI
 		s.handler.log(err.Error())
@@ -469,16 +479,9 @@ func (s *externalStrategy) Restart() error {
 	waitForPortFree(s.handler.Port()) // Ensure port is free
 
 	// Compile synchronously to catch compilation errors (retry once if go mod tidy fixes go.mod/go.sum).
-	if err := s.goCompiler.CompileProgram(); err != nil {
-		if s.handler.goModTidier != nil {
-			if ran, _ := s.handler.goModTidier(err.Error()); ran {
-				err = s.goCompiler.CompileProgram()
-			}
-		}
-		if err != nil {
-			s.handler.log(logClose, "RestartServer failed:", err)
-			return alreadyLoggedErr{err: err}
-		}
+	if err := s.compileWithTidyRetry(); err != nil {
+		s.handler.log(logClose, "RestartServer failed:", err)
+		return alreadyLoggedErr{err: err}
 	}
 
 	// Keep defaultServerOpID active through RunProgram and WaitForPortListening
