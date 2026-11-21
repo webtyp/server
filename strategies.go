@@ -481,9 +481,11 @@ func (s *externalStrategy) Restart() error {
 		}
 	}
 
-	// Clear OperationID before launching the app so startup/runtime lines stay discrete.
-	s.handler.SetLastOperationID("")
-	// Run synchronously so callers (and tests) observe the run before Restart returns.
+	// Keep defaultServerOpID active through RunProgram and WaitForPortListening
+	// so the child's startup banner ("Starting server on port ...") updates the
+	// same live restart line instead of leaving a duplicate line alongside
+	// "Server running on port ...". The defer clears OperationID on return so
+	// subsequent runtime app output stays discrete.
 	if err := s.goRun.RunProgram(); err != nil {
 		s.handler.log(logClose, "RunProgram failed:", err)
 		return alreadyLoggedErr{err: err}

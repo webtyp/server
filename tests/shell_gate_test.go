@@ -136,3 +136,20 @@ func TestShellIsClosedWithoutSession(t *testing.T) {
 		}
 	})
 }
+
+// An app WITHOUT public pages: sitec leaves the shell at "/" and there is no app/ folder. Every sign-in still sends
+// the new session to /app/ (auth.PathAfterLogin), so /app/ must lead to the shell, never to a 404 — the sign-in form
+// read that 404 as "Access not authorized on this device" (user story H-ACCESS-01, mjosefa-cms).
+func TestShellAtRoot_AppPathLeadsToIt(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(`<script src="script.js">`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := handlerFor(t, dir, true, "user-1")
+	for _, path := range []string{"/app/", "/app"} {
+		resp := get(t, h, path)
+		if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/" {
+			t.Errorf("GET %s: %d Location %q, want 302 to /", path, resp.StatusCode, resp.Header.Get("Location"))
+		}
+	}
+}

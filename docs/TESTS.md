@@ -25,6 +25,7 @@
 | [TestDecode_GetWithoutQueryLeavesZeroValues](../httpd/formdecode_test.go) | Decode_GetWithoutQueryLeavesZeroValues |
 | [TestDecode_PatchAndDeleteReadTheBody](../httpd/formdecode_test.go) | Decode_PatchAndDeleteReadTheBody |
 | [TestDoors_HandlerSeesNetwork](../httpd/network_test.go) | Doors_HandlerSeesNetwork |
+| [TestExternalRestart_KeepsOperationIDThroughStartup](../restart_opid_test.go) | ExternalRestart_KeepsOperationIDThroughStartup |
 | [TestExternalServerCompilerUsesAppRootDir](../tests/compiler_root_test.go) | ExternalServerCompilerUsesAppRootDir |
 | [TestExternalStrategyLogsAreVisible](../tests/external_log_test.go) | ExternalStrategyLogsAreVisible |
 | [TestExternalStrategyRuntimeErrorLogsAreVisible](../tests/external_log_test.go) | ExternalStrategyRuntimeErrorLogsAreVisible |
@@ -118,6 +119,7 @@
 | [TestRestartLoggerMayReadValue](../tests/log_reentrancy_test.go) | RestartLoggerMayReadValue |
 | [TestRestartServer_DoesNotInvokeHook](../tests/before_external_hook_test.go) | RestartServer_DoesNotInvokeHook |
 | [TestRoute_PatchIsGated](../httpd/formdecode_test.go) | Route_PatchIsGated |
+| [TestShellAtRoot_AppPathLeadsToIt](../tests/shell_gate_test.go) | ShellAtRoot_AppPathLeadsToIt |
 | [TestRouterMiddleware](../tests/router_test.go) | RouterMiddleware |
 | [TestRouterRegistration](../tests/router_test.go) | RouterRegistration |
 | [TestRoutesEndpointDisabled](../httpd/routes_endpoint_test.go) | RoutesEndpointDisabled |
@@ -152,6 +154,7 @@
 | [TestSetExternalServerMode_PreventsSwitchingToInternal](../tests/modes_test.go) | SetExternalServerMode_PreventsSwitchingToInternal |
 | [TestSetExternalServerMode_SwitchesToExternal](../tests/modes_test.go) | SetExternalServerMode_SwitchesToExternal |
 | [TestShellIsClosedWithoutSession](../tests/shell_gate_test.go) | ShellIsClosedWithoutSession |
+| [TestShellAtRoot_AppPathLeadsToIt](../tests/shell_gate_test.go) | ShellAtRoot AppPathLeadsToIt |
 | [TestStartServerLoggerMayReadValue](../tests/log_reentrancy_test.go) | StartServerLoggerMayReadValue |
 | [TestStartServerRunsGeneratedServerAndResponds](../tests/startserver_integration_test.go) | StartServerRunsGeneratedServerAndResponds |
 | [TestStartServer_BeforeHookErrorAborts](../tests/before_external_hook_test.go) | StartServer_BeforeHookErrorAborts |

@@ -60,6 +60,21 @@ func isPublicLanding(absDir, fullPath string) bool {
 	return err == nil
 }
 
+// isShellAtRoot reports whether urlPath asks for the shell path (/app/) of an app whose shell is its root index.html:
+// sitec puts the shell at "/" when the project declares no public pages, and there is then no app/index.html. Every
+// sign-in redirects a new session to /app/ (auth.PathAfterLogin), so without this the person who just signed in got a
+// 404 and the sign-in form read it as "not authorized" (found by the user story H-ACCESS-01).
+func isShellAtRoot(absDir, urlPath string) bool {
+	if urlPath != shellPath && urlPath+"/" != shellPath {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(absDir, shellDir, shellIndexFile)); err == nil {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(absDir, shellIndexFile))
+	return err == nil
+}
+
 func samePath(fullPath, target string) bool {
 	abs, err := filepath.Abs(fullPath)
 	if err != nil {

@@ -69,6 +69,13 @@ func (s *Server) wrapWithBatteries(handler http.Handler) http.Handler {
 					}
 				}
 
+				// /app/ is where every sign-in sends a new session (auth.PathAfterLogin); an app without public
+				// pages has its shell at "/" and no app/ folder, so /app/ is sent there — see shell.go.
+				if !shouldServe && isShellAtRoot(absDir, r.URL.Path) {
+					http.Redirect(w, r, shellFallbackPath, http.StatusFound)
+					return
+				}
+
 				if shouldServe {
 					// The application shell is the one file under PublicDir that is
 					// not public, and the root landing page is the one file a session
